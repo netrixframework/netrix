@@ -38,7 +38,7 @@ func NewVisualizer(ctx *context.RootContext) *Visualizer {
 		messagePool: NewMessageStoreHelper(ctx.MessageStore),
 		messagesCh:  ctx.MessageQueue.Subscribe("Visualizer"),
 		eventCh:     ctx.EventQueue.Subscribe("Visualizer"),
-		eventDag:    types.NewEventDag(),
+		eventDag:    types.NewEventDag(ctx.Replicas),
 
 		latestEvents: make(map[types.ReplicaID]*types.Event),
 		sends:        make(map[string]*types.Event),

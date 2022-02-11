@@ -28,30 +28,16 @@ type Event struct {
 	ID uint64 `json:"id"`
 	// Timestamp of the event
 	Timestamp int64 `json:"timestamp"`
-	// Vector clock value of the event
-	ClockValue ClockValue
 }
 
 func NewEvent(replica ReplicaID, t EventType, ts string, id uint64, time int64) *Event {
 	return &Event{
-		Replica:    replica,
-		Type:       t,
-		TypeS:      ts,
-		ID:         id,
-		Timestamp:  time,
-		ClockValue: nil,
+		Replica:   replica,
+		Type:      t,
+		TypeS:     ts,
+		ID:        id,
+		Timestamp: time,
 	}
-}
-
-// Returns true if the current event is less than `other`
-func (e *Event) Lt(other *Event) bool {
-	if e.ClockValue == nil {
-		return true
-	}
-	if other.ClockValue == nil {
-		return false
-	}
-	return e.ClockValue.Lt(other.ClockValue)
 }
 
 func (e *Event) MessageID() (string, bool) {

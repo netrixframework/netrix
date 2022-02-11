@@ -19,13 +19,16 @@ type Replica struct {
 	Ready bool                   `json:"ready"`
 	Info  map[string]interface{} `json:"info"`
 	Addr  string                 `json:"addr"`
+	index int
 }
 
 // ReplicaStore to store all replica information, thread safe
 type ReplicaStore struct {
 	replicas map[ReplicaID]*Replica
+	index    []ReplicaID
 	lock     *sync.Mutex
 	cap      int
+	size     int
 }
 
 // NewReplicaStore creates an empty ReplicaStore
@@ -34,6 +37,7 @@ func NewReplicaStore(size int) *ReplicaStore {
 		replicas: make(map[ReplicaID]*Replica),
 		lock:     new(sync.Mutex),
 		cap:      size,
+		size:     0,
 	}
 }
 
@@ -41,6 +45,14 @@ func NewReplicaStore(size int) *ReplicaStore {
 func (s *ReplicaStore) Add(p *Replica) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+	existing, ok := s.replicas[p.ID]
+	if !ok {
+		s.index = append(s.index, p.ID)
+		p.index = s.size
+		s.size++
+	} else {
+		p.index = existing.index
+	}
 	s.replicas[p.ID] = p
 }
 
@@ -69,17 +81,17 @@ func (s *ReplicaStore) NumReady() int {
 func (s *ReplicaStore) Count() int {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	return len(s.replicas)
+	return s.size
 }
 
 // Iter returns a list of the existing replicas
 func (s *ReplicaStore) Iter() []*Replica {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	replicas := make([]*Replica, len(s.replicas))
+	replicas := make([]*Replica, s.cap)
 	i := 0
-	for _, p := range s.replicas {
-		replicas[i] = p
+	for _, p := range s.index {
+		replicas[i] = s.replicas[p]
 		i++
 	}
 	return replicas

@@ -38,7 +38,7 @@ func newContext(c *context.RootContext, testcase *TestCase, r *reportStore, d *d
 	return &Context{
 		MessagePool: c.MessageStore,
 		Replicas:    c.Replicas,
-		EventDAG:    types.NewEventDag(),
+		EventDAG:    types.NewEventDag(c.Replicas),
 		Vars:        NewVarSet(),
 
 		counter:     util.NewCounter(),

@@ -2,6 +2,10 @@ package types
 
 type ClockValue []float64
 
+func ZeroClock(replicas int) ClockValue {
+	return make([]float64, replicas)
+}
+
 func (c ClockValue) Lt(other ClockValue) bool {
 	if len(c) != len(other) {
 		return false
