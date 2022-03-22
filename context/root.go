@@ -29,6 +29,8 @@ type RootContext struct {
 	Counter *util.Counter
 	// Logger for logging purposes
 	Logger *log.Logger
+	// ReportStore contains a log of important events
+	ReportStore *types.ReportStore
 }
 
 // NewRootContext creates an instance of the RootContext from the configuration
@@ -44,6 +46,7 @@ func NewRootContext(config *config.Config, logger *log.Logger) *RootContext {
 		TimeoutStore: types.NewTimeoutStore(logger),
 		Counter:      util.NewCounter(),
 		Logger:       logger,
+		ReportStore:  types.NewReportStore(),
 	}
 }
 

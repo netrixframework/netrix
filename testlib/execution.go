@@ -5,24 +5,21 @@ import (
 	"time"
 
 	"github.com/netrixframework/netrix/context"
-	"github.com/netrixframework/netrix/dispatcher"
 	"github.com/netrixframework/netrix/log"
 	"github.com/netrixframework/netrix/types"
 )
 
 type executionState struct {
-	allowEvents bool
-	curCtx      *Context
-	testcase    *TestCase
-	lock        *sync.Mutex
+	allowEvents    bool
+	testcaseDriver *TestCaseDriver
+	lock           *sync.Mutex
 }
 
 func newExecutionState() *executionState {
 	return &executionState{
-		allowEvents: false,
-		curCtx:      nil,
-		testcase:    nil,
-		lock:        new(sync.Mutex),
+		allowEvents:    false,
+		testcaseDriver: nil,
+		lock:           new(sync.Mutex),
 	}
 }
 
@@ -41,31 +38,24 @@ func (e *executionState) Unblock() {
 func (e *executionState) NewTestCase(
 	ctx *context.RootContext,
 	testcase *TestCase,
-	r *reportStore,
-	d *dispatcher.Dispatcher,
-) {
+) error {
+	driver := NewTestDriver(ctx, testcase)
 	e.lock.Lock()
-	defer e.lock.Unlock()
-	e.testcase = testcase
-	e.curCtx = newContext(ctx, testcase, r, d)
+	e.testcaseDriver = driver
+	e.lock.Unlock()
+	return driver.setup()
 }
 
-func (e *executionState) CurCtx() *Context {
+func (e *executionState) CurTestCaseDriver() *TestCaseDriver {
 	e.lock.Lock()
 	defer e.lock.Unlock()
-	return e.curCtx
+	return e.testcaseDriver
 }
 
-func (e *executionState) CurTestCase() *TestCase {
+func (e *executionState) IsBlocked() bool {
 	e.lock.Lock()
 	defer e.lock.Unlock()
-	return e.testcase
-}
-
-func (e *executionState) CanAllowEvents() bool {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-	return e.allowEvents
+	return !e.allowEvents
 }
 
 func (srv *TestingServer) execute() {
@@ -100,8 +90,7 @@ MainLoop:
 
 		// Setup
 		testcaseLogger.Debug("Setting up testcase")
-		srv.executionState.NewTestCase(srv.ctx, testcase, srv.reportStore, srv.dispatcher)
-		err := testcase.setup(srv.executionState.CurCtx())
+		err := srv.executionState.NewTestCase(srv.ctx, testcase)
 		if err != nil {
 			testcaseLogger.With(log.LogParams{"error": err}).Error("Error setting up testcase")
 			goto Finalize
@@ -123,17 +112,24 @@ MainLoop:
 	Finalize:
 		// Finalize report
 		testcaseLogger.Info("Finalizing")
-		ctx := srv.executionState.CurCtx()
 		if testcase.aborted {
 			testcaseLogger.Info("Testcase was aborted")
 		}
 		testcaseLogger.Info("Checking assertion")
-		ok := testcase.assert(ctx)
+		ok := testcase.assert()
+		var okS string
 		if !ok {
 			testcaseLogger.Info("Testcase failed")
+			okS = "fail"
 		} else {
 			testcaseLogger.Info("Testcase succeeded")
+			okS = "succeed"
 		}
+		srv.ctx.ReportStore.Log(map[string]string{
+			"testcase": testcase.Name,
+			"type":     "testcase_result",
+			"result":   okS,
+		})
 		// TODO: Figure out a way to cleanly clear the message pool
 		// Reset the servers and flush the queues after waiting for some time
 		if err := srv.dispatcher.RestartAll(); err != nil {
@@ -148,33 +144,15 @@ MainLoop:
 
 func (srv *TestingServer) pollEvents() {
 	for {
-		if !srv.executionState.CanAllowEvents() {
+		if srv.executionState.IsBlocked() {
 			continue
 		}
 		select {
 		case e := <-srv.eventCh:
+			testcaseDriver := srv.executionState.CurTestCaseDriver()
+			messages := testcaseDriver.Step(e)
 
-			ctx := srv.executionState.CurCtx()
-			testcase := srv.executionState.CurTestCase()
-			srv.reportStore.Log(map[string]string{
-				"testcase":   testcase.Name,
-				"type":       "event",
-				"replica":    string(e.Replica),
-				"event_type": e.TypeS,
-			})
-
-			testcaseLogger := srv.Logger.With(log.LogParams{"testcase": testcase.Name})
-
-			testcaseLogger.With(log.LogParams{"event_id": e.ID, "type": e.TypeS}).Debug("Stepping")
-			// 1. Add event to context and feed context to testcase
-			ctx.setEvent(e)
-			messages := testcase.step(e, ctx)
-
-			select {
-			case <-testcase.doneCh:
-			default:
-				go srv.dispatchMessages(ctx, messages)
-			}
+			go srv.dispatchMessages(messages)
 		case <-srv.QuitCh():
 			return
 		}
@@ -183,15 +161,15 @@ func (srv *TestingServer) pollEvents() {
 
 func (srv *TestingServer) pollMessages() {
 	for {
-		if !srv.executionState.CanAllowEvents() {
+		if srv.executionState.IsBlocked() {
 			continue
 		}
 		select {
 		case m := <-srv.messageCh:
-			testcase := srv.executionState.CurTestCase()
+			testcaseDriver := srv.executionState.CurTestCaseDriver()
 			// Gathering metrics
-			srv.reportStore.Log(map[string]string{
-				"testcase":   testcase.Name,
+			srv.ctx.ReportStore.Log(map[string]string{
+				"testcase":   testcaseDriver.TestCase.Name,
 				"type":       "message",
 				"from":       string(m.From),
 				"to":         string(m.To),
@@ -204,11 +182,8 @@ func (srv *TestingServer) pollMessages() {
 	}
 }
 
-func (srv *TestingServer) dispatchMessages(ctx *Context, messages []*types.Message) {
+func (srv *TestingServer) dispatchMessages(messages []*types.Message) {
 	for _, m := range messages {
-		if !ctx.MessagePool.Exists(m.ID) {
-			ctx.MessagePool.Add(m)
-		}
 		srv.dispatcher.DispatchMessage(m)
 	}
 }

@@ -6,6 +6,8 @@ import (
 	"github.com/netrixframework/netrix/log"
 )
 
+type EventID uint64
+
 // EventType abstract type for representing different types of events
 type EventType interface {
 	// Clone copies the event type
@@ -25,12 +27,12 @@ type Event struct {
 	// TypeS is the string representation of the event
 	TypeS string `json:"type"`
 	// ID unique identifier assigned for every new event
-	ID uint64 `json:"id"`
+	ID EventID `json:"id"`
 	// Timestamp of the event
 	Timestamp int64 `json:"timestamp"`
 }
 
-func NewEvent(replica ReplicaID, t EventType, ts string, id uint64, time int64) *Event {
+func NewEvent(replica ReplicaID, t EventType, ts string, id EventID, time int64) *Event {
 	return &Event{
 		Replica:   replica,
 		Type:      t,

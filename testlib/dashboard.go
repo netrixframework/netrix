@@ -64,7 +64,7 @@ func (srv *TestingServer) handlerLogs(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to unmarshal request"})
 		return
 	}
-	logs := srv.reportStore.GetLogs(r.KeyVals, r.Count, r.From)
+	logs := srv.ctx.ReportStore.GetLogs(r.KeyVals, r.Count, r.From)
 	c.JSON(http.StatusOK, gin.H{
 		"logs": logs,
 	})

@@ -104,7 +104,7 @@ func (srv *APIServer) HandleEvent(c *gin.Context) {
 		e.Replica,
 		eventType,
 		eventType.String(),
-		uint64(srv.gen.Next()),
+		types.EventID((srv.gen.Next())),
 		e.Timestamp,
 	))
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})

@@ -1,4 +1,4 @@
-package dummy
+package strategies
 
 import (
 	"github.com/netrixframework/netrix/context"
@@ -30,7 +30,7 @@ func (d *DummyStrategy) Stop() error {
 	return nil
 }
 
-func (d *DummyStrategy) Step(event *types.Event) []*types.Message {
+func (d *DummyStrategy) Step(event *types.Event, _ []*types.Message) []*types.Message {
 	if !event.IsMessageSend() {
 		return []*types.Message{}
 	}

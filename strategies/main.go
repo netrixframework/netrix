@@ -7,7 +7,6 @@ import (
 	"github.com/netrixframework/netrix/context"
 	"github.com/netrixframework/netrix/dispatcher"
 	"github.com/netrixframework/netrix/log"
-	"github.com/netrixframework/netrix/strategies/dummy"
 	"github.com/netrixframework/netrix/types"
 )
 
@@ -17,14 +16,43 @@ var (
 
 type Strategy interface {
 	types.Service
+	// Step returns the messages to be delivered to the replicas,
+	// Arguments are
+	// 1. The new event received from the replicas
+	// 2. Context containing a set of possible messages that can be delivered
+	Step(*types.Event, []*types.Message) []*types.Message
+}
+
+type Filter interface {
 	Step(*types.Event) []*types.Message
+}
+
+type DefaultFilter struct {
+	ctx *context.RootContext
+}
+
+func NewDefaultFilter(ctx *context.RootContext) *DefaultFilter {
+	return &DefaultFilter{
+		ctx: ctx,
+	}
+}
+
+func (d *DefaultFilter) Step(e *types.Event) []*types.Message {
+	if e.IsMessageSend() {
+		messageID, _ := e.MessageID()
+		message, ok := d.ctx.MessageStore.Get(messageID)
+		if ok {
+			return []*types.Message{message}
+		}
+	}
+	return []*types.Message{}
 }
 
 func GetStrategy(ctx *context.RootContext, s string) (*Driver, error) {
 	var strategy Strategy = nil
 	switch s {
 	case "dummy":
-		strategy = dummy.NewDummyStrategy(ctx)
+		strategy = NewDummyStrategy(ctx)
 	}
 	if strategy == nil {
 		return nil, ErrNoStrategy
@@ -38,6 +66,7 @@ type Driver struct {
 	dispatcher *dispatcher.Dispatcher
 	eventCh    chan *types.Event
 	ctx        *context.RootContext
+	filter     Filter
 	*types.BaseService
 }
 
@@ -48,6 +77,7 @@ func NewDriver(ctx *context.RootContext, strategy Strategy) *Driver {
 		dispatcher:  dispatcher.NewDispatcher(ctx),
 		eventCh:     ctx.EventQueue.Subscribe("StrategyDriver"),
 		ctx:         ctx,
+		filter:      NewDefaultFilter(ctx),
 		BaseService: types.NewBaseService("StrategyDriver", ctx.Logger),
 	}
 	d.apiserver = apiserver.NewAPIServer(ctx, nil, d)
@@ -90,14 +120,22 @@ func (d *Driver) poll() {
 
 		select {
 		case event := <-d.eventCh:
-			messages := d.strategy.Step(event)
-			for _, m := range messages {
-				d.dispatcher.DispatchMessage(m)
-			}
+			go d.dispatchMessages(
+				d.strategy.Step(
+					event,
+					d.filter.Step(event),
+				),
+			)
 		case <-d.strategy.QuitCh():
 			return
 		case <-d.QuitCh():
 			return
 		}
+	}
+}
+
+func (d *Driver) dispatchMessages(messages []*types.Message) {
+	for _, m := range messages {
+		d.dispatcher.DispatchMessage(m)
 	}
 }

@@ -118,43 +118,6 @@ func RecordMessageAs(label string) Action {
 
 type ReplicaFunc func(*types.Event, *Context) (types.ReplicaID, bool)
 
-// StopReplica is the action to stop a replica. The replica details are fetched dynamically through the specified function
-func StopReplica(replicaFunc ReplicaFunc) Action {
-	return func(e *types.Event, c *Context) (messages []*types.Message) {
-		replica, ok := replicaFunc(e, c)
-		if !ok {
-			return
-		}
-		c.dispatcher.StopReplica(replica)
-		return
-	}
-
-}
-
-// StartReplica is the action to start a replica. The replica details are fetched dynamically through the specified function
-func StartReplica(replicaFunc ReplicaFunc) Action {
-	return func(e *types.Event, c *Context) (messages []*types.Message) {
-		replica, ok := replicaFunc(e, c)
-		if !ok {
-			return
-		}
-		c.dispatcher.StartReplica(replica)
-		return
-	}
-}
-
-// RestartReplica is the action to restart a replica. The replica details are fetched dynamically through the specified function
-func RestartReplica(replicaFunc ReplicaFunc) Action {
-	return func(e *types.Event, c *Context) (messages []*types.Message) {
-		replica, ok := replicaFunc(e, c)
-		if !ok {
-			return
-		}
-		c.dispatcher.RestartReplica(replica)
-		return
-	}
-}
-
 // MessageFrom ReplicaFunc returns the message from replica, if the event is a message send/receive
 func MessageFrom() ReplicaFunc {
 	return func(e *types.Event, c *Context) (types.ReplicaID, bool) {

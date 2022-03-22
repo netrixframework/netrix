@@ -82,6 +82,6 @@ func (t *TestCase) SetupFunc(setupFunc func(*Context) error) {
 	t.setup = setupFunc
 }
 
-func (t *TestCase) assert(c *Context) bool {
+func (t *TestCase) assert() bool {
 	return t.StateMachine.InSuccessState()
 }

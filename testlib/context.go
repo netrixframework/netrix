@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/netrixframework/netrix/context"
-	"github.com/netrixframework/netrix/dispatcher"
 	"github.com/netrixframework/netrix/log"
 	"github.com/netrixframework/netrix/types"
 	"github.com/netrixframework/netrix/util"
@@ -25,16 +24,15 @@ type Context struct {
 	Vars *VarSet
 
 	counter     *util.Counter
-	dispatcher  *dispatcher.Dispatcher
 	testcase    *TestCase
-	reportStore *reportStore
+	reportStore *types.ReportStore
 	sends       map[string]*types.Event
 	lock        *sync.Mutex
 	once        *sync.Once
 }
 
 // newContext instantiates a Context from the RootContext
-func newContext(c *context.RootContext, testcase *TestCase, r *reportStore, d *dispatcher.Dispatcher) *Context {
+func newContext(c *context.RootContext, testcase *TestCase) *Context {
 	return &Context{
 		MessagePool: c.MessageStore,
 		Replicas:    c.Replicas,
@@ -42,8 +40,7 @@ func newContext(c *context.RootContext, testcase *TestCase, r *reportStore, d *d
 		Vars:        NewVarSet(),
 
 		counter:     util.NewCounter(),
-		reportStore: r,
-		dispatcher:  d,
+		reportStore: c.ReportStore,
 		testcase:    testcase,
 		sends:       make(map[string]*types.Event),
 		lock:        new(sync.Mutex),
