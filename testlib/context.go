@@ -10,6 +10,10 @@ import (
 	"github.com/netrixframework/netrix/util"
 )
 
+var (
+	partitionKey = "_partition"
+)
+
 // Context struct is passed to the calls of StateAction and Condition
 // encapsulates all information needed by the StateAction and Condition to function
 type Context struct {
@@ -46,6 +50,14 @@ func newContext(c *context.RootContext, testcase *TestCase) *Context {
 		lock:        new(sync.Mutex),
 		once:        new(sync.Once),
 	}
+}
+
+func (c *Context) CreatePartition(sizes []int, labels []string) {
+	partition, err := NewPartition(c.Replicas, sizes, labels)
+	if err != nil {
+		return
+	}
+	c.Vars.Set(partitionKey, partition)
 }
 
 // Logger returns the logger for the current testcase

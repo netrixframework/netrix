@@ -2,6 +2,7 @@ package types
 
 import (
 	"errors"
+	"math/rand"
 	"sync"
 )
 
@@ -110,4 +111,20 @@ func (s *ReplicaStore) ResetReady() {
 // Cap returns the set of replicas used for the test
 func (s *ReplicaStore) Cap() int {
 	return s.cap
+}
+
+func (s *ReplicaStore) GetRandom() (*Replica, bool) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	if len(s.replicas) == 0 {
+		return nil, false
+	}
+	r := make([]ReplicaID, len(s.replicas))
+	i := 0
+	for id := range s.replicas {
+		r[i] = id
+		i++
+	}
+	randomID := r[rand.Intn(len(s.replicas))]
+	return s.replicas[randomID], true
 }

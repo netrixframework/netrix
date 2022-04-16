@@ -30,7 +30,7 @@ func NewLogger(c config.LogConfig) *Logger {
 	var file *os.File
 
 	if c.Path != "" {
-		file, err := os.OpenFile(c.Path, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		file, err := os.Create(c.Path)
 		if err == nil {
 			l.SetOutput(file)
 		}

@@ -35,6 +35,16 @@ func IsEventOf(replica types.ReplicaID) Condition {
 	}
 }
 
+func IsEventOfF(replicaFunc func(*types.Event, *Context) (types.ReplicaID, bool)) Condition {
+	return func(e *types.Event, c *Context) bool {
+		rID, ok := replicaFunc(e, c)
+		if !ok {
+			return false
+		}
+		return e.Replica == rID
+	}
+}
+
 // IsMessageSend condition returns true if the event is a message send event
 func IsMessageSend() Condition {
 	return func(e *types.Event, ctx *Context) bool {
@@ -286,10 +296,36 @@ func (o *once) check() Condition {
 }
 
 // Once is a meta condition that allows the inner condition to be true only once
-func Once(c Condition) Condition {
+func OnceCondition(c Condition) Condition {
 	o := &once{
 		done: false,
 		c:    c,
 	}
 	return o.check()
+}
+
+func IsMessageFromPart(partLabel string) Condition {
+	return func(e *types.Event, c *Context) bool {
+		partition, ok := getPartition(c)
+		if !ok {
+			return false
+		}
+		message, ok := c.GetMessage(e)
+		if !ok {
+			return false
+		}
+		return partition.InPart(message.From, partLabel)
+	}
+}
+
+func getPartition(c *Context) (*ReplicaPartition, bool) {
+	partitionI, ok := c.Vars.Get(partitionKey)
+	if !ok {
+		return nil, false
+	}
+	partition, ok := partitionI.(*ReplicaPartition)
+	if !ok {
+		return nil, false
+	}
+	return partition, true
 }
