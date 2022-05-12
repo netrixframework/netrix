@@ -101,18 +101,18 @@ func (v *VarSet) GetCounter(label string) (*Counter, bool) {
 func (v *VarSet) NewMessageSet(label string) {
 	v.lock.Lock()
 	defer v.lock.Unlock()
-	v.vars[label] = types.NewMessageStore()
+	v.vars[label] = types.NewMap[string, *types.Message]()
 }
 
 // GetMessageSet returns the message set at label if one exists (nil, false) otherwise
-func (v *VarSet) GetMessageSet(label string) (*types.MessageStore, bool) {
+func (v *VarSet) GetMessageSet(label string) (*types.Map[types.MessageID, *types.Message], bool) {
 	v.lock.Lock()
 	defer v.lock.Unlock()
 	sI, exists := v.vars[label]
 	if !exists {
 		return nil, false
 	}
-	set, ok := sI.(*types.MessageStore)
+	set, ok := sI.(*types.Map[types.MessageID, *types.Message])
 	return set, ok
 }
 

@@ -29,7 +29,7 @@ func (srv *APIServer) HandleMessage(c *gin.Context) {
 
 	msg.Parse(srv.messageParser)
 
-	srv.ctx.MessageStore.Add(&msg)
+	srv.ctx.MessageStore.Add(msg.ID, &msg)
 	srv.ctx.MessageQueue.Add(&msg)
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
@@ -128,24 +128,4 @@ func (srv *APIServer) handleReplicaGet(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, replica)
-}
-
-// HandleLog is the handler for the route `/log`
-// The route is used by replicas to send log messages
-func (srv *APIServer) HandleLog(c *gin.Context) {
-	var l types.ReplicaLog
-	if err := c.ShouldBindJSON(&l); err != nil {
-		srv.Logger.With(log.LogParams{"error": err}).Debug("Bad replica log request")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to unmarshall request"})
-		return
-	}
-
-	srv.Logger.With(log.LogParams{
-		"replica": l.Replica,
-		"message": l.Message,
-	}).Debug("Received replica log")
-
-	srv.ctx.LogStore.Add(&l)
-	srv.ctx.LogQueue.Add(&l)
-	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }

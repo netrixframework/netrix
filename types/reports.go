@@ -19,21 +19,21 @@ func (r *reportLog) match(keyvals map[string]string) bool {
 	return true
 }
 
-type ReportStore struct {
+type ReportLogs struct {
 	logs []*reportLog
 	size uint64
 	lock *sync.Mutex
 }
 
-func NewReportStore() *ReportStore {
-	return &ReportStore{
+func NewReportLogs() *ReportLogs {
+	return &ReportLogs{
 		logs: make([]*reportLog, 0),
 		size: 0,
 		lock: new(sync.Mutex),
 	}
 }
 
-func (r *ReportStore) Log(keyvals map[string]string) {
+func (r *ReportLogs) Log(keyvals map[string]string) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	r.logs = append(r.logs, &reportLog{
@@ -43,7 +43,7 @@ func (r *ReportStore) Log(keyvals map[string]string) {
 	r.size += 1
 }
 
-func (r *ReportStore) GetLogs(keyvals map[string]string, count int, from int) []*reportLog {
+func (r *ReportLogs) GetLogs(keyvals map[string]string, count int, from int) []*reportLog {
 	if count == -1 {
 		count = 100
 	}
@@ -59,7 +59,7 @@ func (r *ReportStore) GetLogs(keyvals map[string]string, count int, from int) []
 	return r.filter(keyvals, from, count)
 }
 
-func (r *ReportStore) filter(keyvals map[string]string, from int, count int) []*reportLog {
+func (r *ReportLogs) filter(keyvals map[string]string, from int, count int) []*reportLog {
 	resultSize := 0
 	result := make([]*reportLog, 0)
 

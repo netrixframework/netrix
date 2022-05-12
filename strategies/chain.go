@@ -25,7 +25,7 @@ func (c *StrategyChain) AddStrategy(s Strategy) {
 	c.strategies = append(c.strategies, s)
 }
 
-func (c *StrategyChain) Step(e *types.Event, in []*types.Message) []*types.Message {
+func (c *StrategyChain) Step(e *types.Event, ctx *context.RootContext) []*types.Message {
 	next := in
 	for _, s := range c.strategies {
 		next = s.Step(e, next)

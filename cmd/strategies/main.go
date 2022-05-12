@@ -26,7 +26,7 @@ func StrategiesCmd() *cobra.Command {
 			log.Init(conf.LogConfig)
 			ctx := context.NewRootContext(conf, log.DefaultLogger)
 
-			strategy, err := strategies.GetStrategy(ctx, args[0])
+			strategy, err := strategies.GetStrategyDriver(ctx, args[0])
 			if err != nil {
 				return fmt.Errorf("failed to initialize strategy: %s", err)
 			}

@@ -61,13 +61,13 @@ func CountTo(label string) *CountWrapper {
 // SetWrapper encapsulates the mechanism to fetch a message set from the state.
 // SetFunc should return a message set given the current event and context.
 type SetWrapper struct {
-	SetFunc func(*types.Event, *Context) (*types.MessageStore, bool)
+	SetFunc func(*types.Event, *Context) (*types.Map[types.MessageID, *types.Message], bool)
 }
 
 // Set returns a SetWrapper where the set is fetched based on the label
 func Set(label string) *SetWrapper {
 	return &SetWrapper{
-		SetFunc: func(e *types.Event, c *Context) (*types.MessageStore, bool) {
+		SetFunc: func(e *types.Event, c *Context) (*types.Map[types.MessageID, *types.Message], bool) {
 			set, ok := c.Vars.GetMessageSet(label)
 			if !ok {
 				c.Vars.NewMessageSet(label)
@@ -81,7 +81,7 @@ func Set(label string) *SetWrapper {
 // SetF returns a SetWrapper where the label is determined dynamically by the event and context
 func SetF(labelFunc func(*types.Event, *Context) (string, bool)) *SetWrapper {
 	return &SetWrapper{
-		SetFunc: func(e *types.Event, c *Context) (*types.MessageStore, bool) {
+		SetFunc: func(e *types.Event, c *Context) (*types.Map[types.MessageID, *types.Message], bool) {
 			label, ok := labelFunc(e, c)
 			if !ok {
 				return nil, false

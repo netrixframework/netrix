@@ -84,7 +84,7 @@ func (s *SetWrapper) Store() Action {
 		if !ok {
 			return []*types.Message{}
 		}
-		set.Add(message)
+		set.Add(message.ID, message)
 		return []*types.Message{}
 	}
 }
@@ -97,7 +97,7 @@ func (s *SetWrapper) DeliverAll() Action {
 		if !ok {
 			return []*types.Message{}
 		}
-		result := set.Iter()
+		result := set.IterValues()
 		set.RemoveAll()
 		return result
 	}

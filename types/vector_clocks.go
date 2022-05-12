@@ -36,10 +36,10 @@ func (c ClockValue) Eq(other ClockValue) bool {
 
 type GlobalClock struct {
 	dag          *EventDAG
-	messageStore *MessageStore
+	messageStore *Map[string, *Message]
 }
 
-func NewGlobalClock(dag *EventDAG, messageStore *MessageStore) *GlobalClock {
+func NewGlobalClock(dag *EventDAG, messageStore *Map[string, *Message]) *GlobalClock {
 	return &GlobalClock{
 		dag:          dag,
 		messageStore: messageStore,

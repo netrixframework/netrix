@@ -31,12 +31,12 @@ func (d *TestCaseDriver) Step(e *types.Event) []*types.Message {
 
 	for _, m := range messages {
 		if !d.ctx.MessagePool.Exists(m.ID) {
-			d.ctx.MessagePool.Add(m)
+			d.ctx.MessagePool.Add(m.ID, m)
 		}
 	}
 	return messages
 }
 
 func (d *TestCaseDriver) setup() error {
-	return nil
+	return d.TestCase.setup(d.ctx)
 }

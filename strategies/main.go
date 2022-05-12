@@ -19,12 +19,8 @@ type Strategy interface {
 	// Step returns the messages to be delivered to the replicas,
 	// Arguments are
 	// 1. The new event received from the replicas
-	// 2. Context containing a set of possible messages that can be delivered
-	Step(*types.Event, []*types.Message) []*types.Message
-}
-
-type Filter interface {
-	Step(*types.Event) []*types.Message
+	// 2. List of new messages that can be delivered
+	Step(*types.Event, *context.RootContext) []*types.Message
 }
 
 type DefaultFilter struct {
@@ -48,7 +44,7 @@ func (d *DefaultFilter) Step(e *types.Event) []*types.Message {
 	return []*types.Message{}
 }
 
-func GetStrategy(ctx *context.RootContext, s string) (*Driver, error) {
+func GetStrategyDriver(ctx *context.RootContext, s string) (*Driver, error) {
 	var strategy Strategy = nil
 	switch s {
 	case "dummy":

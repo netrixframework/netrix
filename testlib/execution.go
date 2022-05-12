@@ -174,7 +174,7 @@ func (srv *TestingServer) pollMessages() {
 				"from":       string(m.From),
 				"to":         string(m.To),
 				"message":    m.Repr,
-				"message_id": m.ID,
+				"message_id": string(m.ID),
 			})
 		case <-srv.QuitCh():
 			return

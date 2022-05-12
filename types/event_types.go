@@ -8,13 +8,13 @@ import (
 // MessageSendEventType is the event type where a message is sent from the replica
 type MessageSendEventType struct {
 	// MessageID of the message that was sent
-	MessageID string
+	MessageID MessageID
 }
 
 // NewMessageSendEventType instantiates MessageSendEventType
 func NewMessageSendEventType(messageID string) *MessageSendEventType {
 	return &MessageSendEventType{
-		MessageID: messageID,
+		MessageID: MessageID(messageID),
 	}
 }
 
@@ -38,13 +38,13 @@ func (s *MessageSendEventType) String() string {
 // MessageReceiveEventType is the event type when a replica receives a message
 type MessageReceiveEventType struct {
 	// MessageID is the ID of the message received
-	MessageID string
+	MessageID MessageID
 }
 
 // NewMessageReceiveEventType instantiates MessageReceiveEventType
 func NewMessageReceiveEventType(messageID string) *MessageReceiveEventType {
 	return &MessageReceiveEventType{
-		MessageID: messageID,
+		MessageID: MessageID(messageID),
 	}
 }
 

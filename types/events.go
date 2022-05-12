@@ -1,11 +1,5 @@
 package types
 
-import (
-	"sync"
-
-	"github.com/netrixframework/netrix/log"
-)
-
 type EventID uint64
 
 // EventType abstract type for representing different types of events
@@ -42,7 +36,7 @@ func NewEvent(replica ReplicaID, t EventType, ts string, id EventID, time int64)
 	}
 }
 
-func (e *Event) MessageID() (string, bool) {
+func (e *Event) MessageID() (MessageID, bool) {
 	switch eType := e.Type.(type) {
 	case *MessageReceiveEventType:
 		return eType.MessageID, true
@@ -103,107 +97,4 @@ func (e *Event) Clone() Clonable {
 		ID:        e.ID,
 		Timestamp: e.Timestamp,
 	}
-}
-
-// EventQueue datastructure to store the messages in a FIFO queue
-type EventQueue struct {
-	events      []*Event
-	subscribers map[string]chan *Event
-	lock        *sync.Mutex
-	size        int
-	dispatchWG  *sync.WaitGroup
-	*BaseService
-}
-
-// NewEventQueue returns an empty EventQueue
-func NewEventQueue(logger *log.Logger) *EventQueue {
-	return &EventQueue{
-		events:      make([]*Event, 0),
-		size:        0,
-		subscribers: make(map[string]chan *Event),
-		lock:        new(sync.Mutex),
-		dispatchWG:  new(sync.WaitGroup),
-		BaseService: NewBaseService("EventQueue", logger),
-	}
-}
-
-// Start implements Service
-func (q *EventQueue) Start() error {
-	q.StartRunning()
-	go q.dispatchloop()
-	return nil
-}
-
-func (q *EventQueue) dispatchloop() {
-	for {
-		q.lock.Lock()
-		size := q.size
-		messages := q.events
-		subcribers := q.subscribers
-		q.lock.Unlock()
-
-		if size > 0 {
-			toAdd := messages[0]
-
-			for _, s := range subcribers {
-				q.dispatchWG.Add(1)
-				go func(subs chan *Event) {
-					select {
-					case subs <- toAdd.Clone().(*Event):
-					case <-q.QuitCh():
-					}
-					q.dispatchWG.Done()
-				}(s)
-			}
-
-			q.lock.Lock()
-			q.size = q.size - 1
-			q.events = q.events[1:]
-			q.lock.Unlock()
-		}
-	}
-}
-
-// Stop implements Service
-func (q *EventQueue) Stop() error {
-	q.StopRunning()
-	q.dispatchWG.Wait()
-	return nil
-}
-
-// Add adds a message to the queue
-func (q *EventQueue) Add(m *Event) {
-	q.lock.Lock()
-	defer q.lock.Unlock()
-
-	q.events = append(q.events, m)
-	q.size = q.size + 1
-}
-
-// Flush clears the queue of all messages
-func (q *EventQueue) Flush() {
-	q.lock.Lock()
-	defer q.lock.Unlock()
-
-	q.events = make([]*Event, 0)
-	q.size = 0
-}
-
-// Restart implements Service
-func (q *EventQueue) Restart() error {
-	q.Flush()
-	return nil
-}
-
-// Subscribe creates and returns a channel for the subscriber with the given label
-func (q *EventQueue) Subscribe(label string) chan *Event {
-	q.lock.Lock()
-	defer q.lock.Unlock()
-	ch, ok := q.subscribers[label]
-	if ok {
-		return ch
-	}
-	newChan := make(chan *Event, 10)
-	q.subscribers[label] = newChan
-	return newChan
 }

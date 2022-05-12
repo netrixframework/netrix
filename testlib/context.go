@@ -18,7 +18,7 @@ var (
 // encapsulates all information needed by the StateAction and Condition to function
 type Context struct {
 	// MessagePool reference to an instance of the MessageStore
-	MessagePool *types.MessageStore
+	MessagePool *types.Map[types.MessageID, *types.Message]
 	// Replicas reference to the replica store
 	Replicas *types.ReplicaStore
 	// EventDAG is the directed acyclic graph all prior events
@@ -29,8 +29,8 @@ type Context struct {
 
 	counter     *util.Counter
 	testcase    *TestCase
-	reportStore *types.ReportStore
-	sends       map[string]*types.Event
+	reportStore *types.ReportLogs
+	sends       map[types.MessageID]*types.Event
 	lock        *sync.Mutex
 	once        *sync.Once
 }
@@ -46,7 +46,7 @@ func newContext(c *context.RootContext, testcase *TestCase) *Context {
 		counter:     util.NewCounter(),
 		reportStore: c.ReportStore,
 		testcase:    testcase,
-		sends:       make(map[string]*types.Event),
+		sends:       make(map[types.MessageID]*types.Event),
 		lock:        new(sync.Mutex),
 		once:        new(sync.Once),
 	}
@@ -83,7 +83,7 @@ func (c *Context) NewMessage(cur *types.Message, data []byte) *types.Message {
 		To:        cur.To,
 		Data:      data,
 		Type:      cur.Type,
-		ID:        fmt.Sprintf("%s_%s_change%d", cur.From, cur.To, c.counter.Next()),
+		ID:        types.MessageID(fmt.Sprintf("%s_%s_change%d", cur.From, cur.To, c.counter.Next())),
 		Intercept: cur.Intercept,
 	}
 }
