@@ -69,14 +69,19 @@ func (s *Map[T, V]) IterValues() []V {
 	return vals
 }
 
+func (s *Map[T, V]) ToMap() map[T]V {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	m := make(map[T]V)
+	for k, v := range s.m {
+		m[k] = v
+	}
+	return m
+}
+
 // Clonable is any type which returns a copy of itself on Clone()
 type Clonable interface {
 	Clone() Clonable
-}
-
-// Generic subscriber to maintain state of the subsciber
-type Subscriber struct {
-	Ch chan interface{}
 }
 
 type Queue[V Clonable] struct {

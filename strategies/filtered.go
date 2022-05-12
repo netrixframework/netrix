@@ -6,7 +6,7 @@ import (
 )
 
 type Filter interface {
-	Step(*types.Event) []*types.Message
+	Step(*types.Event, *Context) []*types.Event
 }
 
 type FilteredStrategy struct {
@@ -26,6 +26,19 @@ func NewFilteredStrategy(filter Filter, strategy Strategy, logger *log.Logger) *
 	}
 }
 
-func (f *FilteredStrategy) Step(e *types.Event) {
+func (f *FilteredStrategy) Start() error {
+	return nil
+}
+
+func (f *FilteredStrategy) Stop() error {
+	return nil
+}
+
+func (f *FilteredStrategy) Step(e *types.Event, c *Context) Action {
+	// TODO: fill this up
+	return DoNothing()
+}
+
+func (f *FilteredStrategy) NextIteration() {
 
 }

@@ -16,7 +16,7 @@ var (
 
 type MessageID string
 
-// Message stores a message that has been interecepted between two replicas
+// Message stores a message that has been intercepted between two replicas
 type Message struct {
 	From          ReplicaID     `json:"from"`
 	To            ReplicaID     `json:"to"`

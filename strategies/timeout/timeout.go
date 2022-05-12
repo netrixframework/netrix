@@ -1,29 +1,24 @@
 package timeout
 
 import (
-	"github.com/netrixframework/netrix/context"
+	"github.com/netrixframework/netrix/strategies"
 	"github.com/netrixframework/netrix/types"
 )
 
 type TimeoutStrategy struct {
-	ctx             *context.RootContext
 	pendingMessages map[string]*types.Message
-	eventDAG        *types.EventDAG
 	*types.BaseService
 }
 
-func NewTimeoutStrategy(ctx *context.RootContext) *TimeoutStrategy {
+func NewTimeoutStrategy() *TimeoutStrategy {
 	return &TimeoutStrategy{
-		ctx:             ctx,
 		pendingMessages: make(map[string]*types.Message),
-		BaseService:     types.NewBaseService("TimeoutStrategy", ctx.Logger),
+		BaseService:     types.NewBaseService("TimeoutStrategy", nil),
 	}
 }
 
-func (t *TimeoutStrategy) Step(e *types.Event, in []*types.Message) *types.Message {
-	for _, m := range in {
-		t.pendingMessages[m.ID] = m
-	}
+func (t *TimeoutStrategy) Step(e *types.Event, ctx *strategies.Context) strategies.Action {
+	// TODO: fill this up
 
-	return nil
+	return strategies.DoNothing()
 }

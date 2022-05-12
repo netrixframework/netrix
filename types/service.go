@@ -18,6 +18,8 @@ type Service interface {
 	Stop() error
 	// Quit returns a channel which will be closed once the service stops running
 	QuitCh() <-chan struct{}
+	// SetLogger initializes the logger for the service
+	SetLogger(*log.Logger)
 }
 
 // RestartableService is a service which can be restarted
@@ -84,4 +86,8 @@ func (b *BaseService) Running() bool {
 // QuitCh returns the quit channel which will be closed when the service stops running
 func (b *BaseService) QuitCh() <-chan struct{} {
 	return b.quit
+}
+
+func (b *BaseService) SetLogger(logger *log.Logger) {
+	b.Logger = logger
 }

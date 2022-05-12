@@ -2,10 +2,11 @@ package z3
 
 import (
 	"fmt"
+	"testing"
 )
 
 // This example is a basic mathematical example
-func ExampleBasicMath() {
+func TestBasicMath(t *testing.T) {
 	// Create the context
 	config := NewConfig()
 	ctx := NewContext(config)
@@ -52,7 +53,7 @@ func ExampleBasicMath() {
 	s.Assert(x.Add(y).Eq(ctx.Int(-3, ctx.IntSort())))
 
 	if v := s.Check(); v != True {
-		fmt.Println("Unsolveable")
+		fmt.Println("Cannot be solved")
 		return
 	}
 
@@ -71,7 +72,7 @@ func ExampleBasicMath() {
 }
 
 // From C examples: demorgan
-func ExampleDemorgan() {
+func TestDemorgan(t *testing.T) {
 	// Create the context
 	config := NewConfig()
 	ctx := NewContext(config)
@@ -112,7 +113,7 @@ func ExampleDemorgan() {
 }
 
 // From C examples: find_model_example2
-func ExampleFindModel2() {
+func TestFindModel2(t *testing.T) {
 	// Create the context
 	config := NewConfig()
 	defer config.Close()

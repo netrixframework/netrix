@@ -74,7 +74,6 @@ type EventNode struct {
 	next       EventID
 	Parents    *EventNodeSet `json:"parents"`
 	Children   *EventNodeSet `json:"children"`
-	dirty      bool
 	lock       *sync.Mutex
 }
 
@@ -86,7 +85,6 @@ func NewEventNode(e *Event) *EventNode {
 		next:       0,
 		Parents:    NewEventNodeSet(),
 		Children:   NewEventNodeSet(),
-		dirty:      false,
 		lock:       new(sync.Mutex),
 	}
 }
@@ -99,7 +97,6 @@ func (n *EventNode) Clone() *EventNode {
 		next:       n.next,
 		Parents:    n.Parents.Clone(),
 		Children:   n.Children.Clone(),
-		dirty:      false,
 		lock:       new(sync.Mutex),
 	}
 }
@@ -134,29 +131,11 @@ func (n *EventNode) GetPrev() EventID {
 	return n.prev
 }
 
-func (n *EventNode) MarkDirty() {
-	n.lock.Lock()
-	defer n.lock.Unlock()
-	n.dirty = true
-}
-
-func (n *EventNode) MarkClean() {
-	n.lock.Lock()
-	defer n.lock.Unlock()
-	n.dirty = false
-}
-
 func (n *EventNode) AddParents(parents []*EventNode) {
 	for _, p := range parents {
 		n.Parents.Add(p.Event.ID)
 		p.Children.Add(n.Event.ID)
 	}
-}
-
-func (n *EventNode) IsDirty() bool {
-	n.lock.Lock()
-	defer n.lock.Unlock()
-	return n.dirty
 }
 
 func (n *EventNode) Lt(other *EventNode) bool {
@@ -173,6 +152,7 @@ type EventDAG struct {
 	nodes   map[EventID]*EventNode
 	strands map[ReplicaID]EventID
 	latest  map[ReplicaID]EventID
+	sends   map[MessageID]*EventNode
 	lock    *sync.Mutex
 
 	latestClocks map[ReplicaID]ClockValue
@@ -185,6 +165,7 @@ func NewEventDag(replicaStore *ReplicaStore) *EventDAG {
 		nodes:   make(map[EventID]*EventNode),
 		strands: make(map[ReplicaID]EventID),
 		latest:  make(map[ReplicaID]EventID),
+		sends:   make(map[MessageID]*EventNode),
 		lock:    new(sync.Mutex),
 
 		latestClocks: make(map[ReplicaID]ClockValue),
@@ -249,6 +230,18 @@ func (d *EventDAG) AddNode(e *Event, parents []*Event) {
 		parentNodes = append(parentNodes, lN)
 	}
 	d.latest[e.Replica] = e.ID
+
+	if e.IsMessageSend() {
+		messageID, _ := e.MessageID()
+		d.sends[messageID] = node
+	} else if e.IsMessageReceive() {
+		messageID, _ := e.MessageID()
+		send, ok := d.sends[messageID]
+		if ok {
+			parentNodes = append(parentNodes, send)
+			delete(d.sends, messageID)
+		}
+	}
 
 	node.AddParents(parentNodes)
 	node.SetClock(d.nextClock(node, parentNodes))

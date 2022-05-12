@@ -20,7 +20,7 @@ var (
 	ErrFailedMarshal = errors.New("failed to marshal data")
 	// ErrDuplicateDispatch is returned when a message already sent is being dispatched again
 	ErrDuplicateDispatch = errors.New("message already dispatched")
-	// ErrSendFaied is returned when the request could not be created
+	// ErrSendFailed is returned when the request could not be created
 	ErrSendFailed = errors.New("sending failed")
 	// ErrResponseReadFail is returned when the response to the request could not be read
 	ErrResponseReadFail = errors.New("failed to read response")
@@ -54,7 +54,7 @@ type Dispatcher struct {
 	logger   *log.Logger
 
 	clients            map[types.ReplicaID]*http.Client
-	dispatchedMessages map[string]bool
+	dispatchedMessages map[types.MessageID]bool
 	lock               *sync.Mutex
 }
 
@@ -64,7 +64,7 @@ func NewDispatcher(ctx *context.RootContext) *Dispatcher {
 		Replicas:           ctx.Replicas,
 		logger:             ctx.Logger.With(log.LogParams{"service": "dispatcher"}),
 		clients:            make(map[types.ReplicaID]*http.Client),
-		dispatchedMessages: make(map[string]bool),
+		dispatchedMessages: make(map[types.MessageID]bool),
 		lock:               new(sync.Mutex),
 	}
 }

@@ -1,22 +1,19 @@
 package strategies
 
 import (
-	"github.com/netrixframework/netrix/context"
 	"github.com/netrixframework/netrix/log"
 	"github.com/netrixframework/netrix/types"
 )
 
 type DummyStrategy struct {
-	ctx *context.RootContext
 	*types.BaseService
 }
 
-var _ types.Service = &DummyStrategy{}
+var _ Strategy = &DummyStrategy{}
 
-func NewDummyStrategy(ctx *context.RootContext) *DummyStrategy {
+func NewDummyStrategy() *DummyStrategy {
 	return &DummyStrategy{
-		ctx:         ctx,
-		BaseService: types.NewBaseService("dummyStrategy", ctx.Logger),
+		BaseService: types.NewBaseService("dummyStrategy", nil),
 	}
 }
 
@@ -30,19 +27,23 @@ func (d *DummyStrategy) Stop() error {
 	return nil
 }
 
-func (d *DummyStrategy) Step(event *types.Event, _ []*types.Message) []*types.Message {
+func (d *DummyStrategy) Step(event *types.Event, c *Context) Action {
 	if !event.IsMessageSend() {
-		return []*types.Message{}
+		return DoNothing()
 	}
 	messageID, _ := event.MessageID()
-	message, ok := d.ctx.MessageStore.Get(messageID)
+	message, ok := c.Messages.Get(messageID)
 	if ok {
 		d.Logger.With(log.LogParams{
 			"message_id": messageID,
 			"from":       message.From,
 			"to":         message.To,
 		}).Debug("Delivering message")
-		return []*types.Message{message}
+		return DeliverMessage(message)
 	}
-	return []*types.Message{}
+	return DoNothing()
+}
+
+func (d *DummyStrategy) NextIteration() {
+
 }

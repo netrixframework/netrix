@@ -23,7 +23,7 @@ type Context struct {
 	Replicas *types.ReplicaStore
 	// EventDAG is the directed acyclic graph all prior events
 	EventDAG *types.EventDAG
-	// Vars is a generic key value store to facilate maintaining auxilliary information
+	// Vars is a generic key value store to facilitate maintaining auxiliary information
 	// during the execution of a testcase
 	Vars *VarSet
 

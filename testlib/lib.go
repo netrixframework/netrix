@@ -7,7 +7,7 @@ import (
 	"github.com/netrixframework/netrix/types"
 )
 
-// VarSet is a dictionary for storing auxilliary state during the execution of the testcase
+// VarSet is a dictionary for storing auxiliary state during the execution of the testcase
 // VarSet is stored in the context passed to actions and conditions
 type VarSet struct {
 	vars map[string]interface{}
