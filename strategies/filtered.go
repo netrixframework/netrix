@@ -42,3 +42,7 @@ func (f *FilteredStrategy) Step(e *types.Event, c *Context) Action {
 func (f *FilteredStrategy) NextIteration() {
 
 }
+
+func (f *FilteredStrategy) Finalize() {
+
+}

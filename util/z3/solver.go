@@ -59,3 +59,11 @@ func (s *Solver) Model() *Model {
 	m.IncRef()
 	return m
 }
+
+func (s *Solver) Push() {
+	C.Z3_solver_push(s.rawCtx, s.rawSolver)
+}
+
+func (s *Solver) Pop(b uint) {
+	C.Z3_solver_pop(s.rawCtx, s.rawSolver, C.uint(b))
+}

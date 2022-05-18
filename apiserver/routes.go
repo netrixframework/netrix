@@ -21,7 +21,7 @@ func (srv *APIServer) HandleMessage(c *gin.Context) {
 	srv.Logger.Debug("Handling message")
 	var msg types.Message
 	if err := c.ShouldBindJSON(&msg); err != nil {
-		srv.Logger.With(log.LogParams{"error": err}).Info("Bad message")
+		srv.Logger.With(log.LogParams{"error": err}).Debug("Bad message")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to unmarshal request"})
 		return
 	}
@@ -39,7 +39,7 @@ func (srv *APIServer) HandleMessage(c *gin.Context) {
 func (srv *APIServer) HandleReplicaPost(c *gin.Context) {
 	var replica types.Replica
 	if err := c.ShouldBindJSON(&replica); err != nil {
-		srv.Logger.With(log.LogParams{"error": err}).Info("Bad replica request")
+		srv.Logger.With(log.LogParams{"error": err}).Debug("Bad replica request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to unmarshal request"})
 		return
 	}
@@ -48,7 +48,7 @@ func (srv *APIServer) HandleReplicaPost(c *gin.Context) {
 		"replica_id": replica.ID,
 		"ready":      replica.Ready,
 		"info":       replica.Info,
-	}).Info("Received replica information")
+	}).Debug("Received replica information")
 
 	srv.ctx.Replicas.Add(&replica)
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
@@ -64,7 +64,7 @@ type eventS struct {
 func (srv *APIServer) HandleEvent(c *gin.Context) {
 	var e eventS
 	if err := c.ShouldBindJSON(&e); err != nil {
-		srv.Logger.With(log.LogParams{"error": err}).Info("Bad event request")
+		srv.Logger.With(log.LogParams{"error": err}).Debug("Bad event request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to unmarshal request"})
 		return
 	}

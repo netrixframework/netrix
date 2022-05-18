@@ -30,13 +30,13 @@ func TestBasicMath(t *testing.T) {
 	y := ctx.Const(ctx.Symbol("y"), ctx.IntSort())
 	z := ctx.Const(ctx.Symbol("z"), ctx.IntSort())
 
-	zero := ctx.Int(0, ctx.IntSort()) // To save repeats
+	zero := ctx.Int(0) // To save repeats
 
 	// x + y + z > 4
-	s.Assert(x.Add(y, z).Gt(ctx.Int(4, ctx.IntSort())))
+	s.Assert(x.Add(y, z).Gt(ctx.Int(4)))
 
 	// x + y < 2
-	s.Assert(x.Add(y).Lt(ctx.Int(2, ctx.IntSort())))
+	s.Assert(x.Add(y).Lt(ctx.Int(2)))
 
 	// z > 0
 	s.Assert(z.Gt(zero))
@@ -50,7 +50,7 @@ func TestBasicMath(t *testing.T) {
 	s.Assert(z.Eq(zero).Not())
 
 	// x + y = -3
-	s.Assert(x.Add(y).Eq(ctx.Int(-3, ctx.IntSort())))
+	s.Assert(x.Add(y).Eq(ctx.Int(-3)))
 
 	if v := s.Check(); v != True {
 		fmt.Println("Cannot be solved")

@@ -4,12 +4,15 @@ import (
 	"github.com/netrixframework/netrix/config"
 	"github.com/netrixframework/netrix/log"
 	"github.com/netrixframework/netrix/types"
+	"github.com/netrixframework/netrix/util"
 )
 
 // RootContext stores the context of the scheduler
 type RootContext struct {
 	// Config and instance of the configuration object
 	Config *config.Config
+	// EventIDGen a thread safe counter to generate event ids
+	EventIDGen *util.Counter
 	// Replicas instance of the ReplicaStore which contains information of all the replicas
 	Replicas *types.ReplicaStore
 	// MessageQueue stores the messages that are _intercepted_ as a queue
@@ -28,6 +31,7 @@ type RootContext struct {
 func NewRootContext(config *config.Config, logger *log.Logger) *RootContext {
 	return &RootContext{
 		Config:       config,
+		EventIDGen:   util.NewCounter(),
 		Replicas:     types.NewReplicaStore(config.NumReplicas),
 		MessageQueue: types.NewQueue[*types.Message](logger),
 		MessageStore: types.NewMap[types.MessageID, *types.Message](),

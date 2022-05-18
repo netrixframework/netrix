@@ -15,7 +15,7 @@ func TestASTReal(t *testing.T) {
 	y := ctx.Const(ctx.Symbol("y"), ctx.IntSort())
 
 	solver.Assert(
-		x.Add(ctx.Real(3, 4).Mul(y)).Le(ctx.Int(0, ctx.IntSort())),
+		x.Add(ctx.Real(3, 4).Mul(y)).Le(ctx.Int(0)),
 	)
 
 	solver.Check()
@@ -29,9 +29,9 @@ func TestASTAdd(t *testing.T) {
 	defer ctx.Close()
 
 	// Create an int
-	v1 := ctx.Int(1, ctx.IntSort())
-	v2 := ctx.Int(2, ctx.IntSort())
-	v3 := ctx.Int(3, ctx.IntSort())
+	v1 := ctx.Int(1)
+	v2 := ctx.Int(2)
+	v3 := ctx.Int(3)
 
 	// Add
 	raw := v1.Add(v2, v3)
@@ -50,9 +50,9 @@ func TestASTMul(t *testing.T) {
 	defer ctx.Close()
 
 	// Create an int
-	v1 := ctx.Int(1, ctx.IntSort())
-	v2 := ctx.Int(2, ctx.IntSort())
-	v3 := ctx.Int(3, ctx.IntSort())
+	v1 := ctx.Int(1)
+	v2 := ctx.Int(2)
+	v3 := ctx.Int(3)
 
 	// Mul
 	raw := v1.Mul(v2, v3)
@@ -71,9 +71,9 @@ func TestASTSub(t *testing.T) {
 	defer ctx.Close()
 
 	// Create an int
-	v1 := ctx.Int(1, ctx.IntSort())
-	v2 := ctx.Int(2, ctx.IntSort())
-	v3 := ctx.Int(3, ctx.IntSort())
+	v1 := ctx.Int(1)
+	v2 := ctx.Int(2)
+	v3 := ctx.Int(3)
 
 	// Sub
 	raw := v1.Sub(v2, v3)

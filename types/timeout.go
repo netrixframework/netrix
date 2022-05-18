@@ -13,7 +13,7 @@ type ReplicaTimeout struct {
 }
 
 func (t *ReplicaTimeout) Key() string {
-	return fmt.Sprintf("%s_%s", t.Replica, t.Type)
+	return fmt.Sprintf("%s_%s_%s", t.Replica, t.Type, t.Duration.String())
 }
 
 func (t *ReplicaTimeout) MarshalJSON() ([]byte, error) {
@@ -44,8 +44,4 @@ func TimeoutFromParams(replica ReplicaID, params map[string]string) (*ReplicaTim
 	}
 	t.Duration = dur
 	return t, true
-}
-
-func (s *Map[string, ReplicaTimeout]) AddTimeout() {
-
 }

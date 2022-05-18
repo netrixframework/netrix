@@ -36,6 +36,7 @@ type ReplicaStore struct {
 func NewReplicaStore(size int) *ReplicaStore {
 	return &ReplicaStore{
 		replicas: make(map[ReplicaID]*Replica),
+		index:    make([]ReplicaID, 0),
 		lock:     new(sync.Mutex),
 		cap:      size,
 		size:     0,

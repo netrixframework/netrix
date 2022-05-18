@@ -41,14 +41,17 @@ type BaseService struct {
 
 // NewBaseService instantiates BaseService
 func NewBaseService(name string, parentLogger *log.Logger) *BaseService {
-	return &BaseService{
+	s := &BaseService{
 		running: false,
 		lock:    new(sync.Mutex),
 		name:    name,
 		o:       new(sync.Once),
 		quit:    make(chan struct{}),
-		Logger:  parentLogger.With(log.LogParams{"service": name}),
 	}
+	if parentLogger != nil {
+		s.Logger = parentLogger.With(log.LogParams{"service": name})
+	}
+	return s
 }
 
 // StartRunning is called to set the running flag

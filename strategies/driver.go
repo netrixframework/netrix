@@ -1,6 +1,7 @@
 package strategies
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -36,7 +37,8 @@ func NewStrategyDriver(config *config.Config, mp types.MessageParser, strategy S
 		dispatcher:    dispatcher.NewDispatcher(ctx),
 		eventCh:       ctx.EventQueue.Subscribe("StrategyDriver"),
 		ctx:           ctx,
-		strategyCtx:   newContext(ctx),
+		config:        &config.StrategyConfig,
+		strategyCtx:   nil,
 		BaseService:   types.NewBaseService("StrategyDriver", ctx.Logger),
 		receiveEvents: false,
 		lock:          new(sync.Mutex),
@@ -51,14 +53,21 @@ func NewStrategyDriver(config *config.Config, mp types.MessageParser, strategy S
 func (d *Driver) Start() error {
 	d.StartRunning()
 	d.apiserver.Start()
+	d.ctx.Start()
 	go d.poll()
 	d.strategy.Start()
-	return d.main()
+	if err := d.main(); err != nil {
+		return err
+	}
+
+	<-d.QuitCh()
+	return nil
 }
 
 func (d *Driver) Stop() error {
 	d.StopRunning()
 	d.apiserver.Stop()
+	d.ctx.Stop()
 	d.strategy.Stop()
 	return nil
 }
@@ -100,9 +109,14 @@ func (d *Driver) performAction(action Action) error {
 }
 
 func (d *Driver) main() error {
-	d.waitForReplicas(false)
+	if err := d.waitForReplicas(false); err != nil {
+		return err
+	}
+	d.strategyCtx = newContext(d.ctx)
 	for d.strategyCtx.CurIteration() < d.config.Iterations {
-		d.waitForReplicas(true)
+		if err := d.waitForReplicas(true); err != nil {
+			return err
+		}
 		d.unblockEvents()
 
 		d.Logger.Info(fmt.Sprintf("Starting iteration %d", d.strategyCtx.CurIteration()))
@@ -117,20 +131,18 @@ func (d *Driver) main() error {
 
 		d.strategyCtx.NextIteration()
 		d.strategy.NextIteration()
-
-		d.ctx.MessageStore.RemoveAll()
-		d.ctx.EventQueue.Flush()
+		d.ctx.Reset()
 
 		d.dispatcher.RestartAll()
 	}
 	return nil
 }
 
-func (d *Driver) waitForReplicas(ready bool) {
+func (d *Driver) waitForReplicas(ready bool) error {
 	for {
 		select {
 		case <-d.QuitCh():
-			return
+			return errors.New("driver quit")
 		default:
 		}
 		count := d.ctx.Replicas.Count()
@@ -141,6 +153,7 @@ func (d *Driver) waitForReplicas(ready bool) {
 			break
 		}
 	}
+	return nil
 }
 
 func (d *Driver) blockEvents() {

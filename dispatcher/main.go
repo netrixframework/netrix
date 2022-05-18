@@ -170,7 +170,7 @@ func (d *Dispatcher) sendDirective(directive *directiveMessage, to *types.Replic
 	d.logger.With(log.LogParams{
 		"action":  directive.Action,
 		"replica": to.ID,
-	}).Info("Dispatching directive!")
+	}).Debug("Dispatching directive!")
 	bytes, err := json.Marshal(directive)
 	if err != nil {
 		return ErrFailedMarshal

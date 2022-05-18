@@ -149,11 +149,12 @@ func (n *EventNode) Lt(other *EventNode) bool {
 }
 
 type EventDAG struct {
-	nodes   map[EventID]*EventNode
-	strands map[ReplicaID]EventID
-	latest  map[ReplicaID]EventID
-	sends   map[MessageID]*EventNode
-	lock    *sync.Mutex
+	nodes         map[EventID]*EventNode
+	strands       map[ReplicaID]EventID
+	latest        map[ReplicaID]EventID
+	sends         map[MessageID]*EventNode
+	timeoutStarts map[string]*EventNode
+	lock          *sync.Mutex
 
 	latestClocks map[ReplicaID]ClockValue
 	clockLock    *sync.Mutex
@@ -162,11 +163,12 @@ type EventDAG struct {
 
 func NewEventDag(replicaStore *ReplicaStore) *EventDAG {
 	d := &EventDAG{
-		nodes:   make(map[EventID]*EventNode),
-		strands: make(map[ReplicaID]EventID),
-		latest:  make(map[ReplicaID]EventID),
-		sends:   make(map[MessageID]*EventNode),
-		lock:    new(sync.Mutex),
+		nodes:         make(map[EventID]*EventNode),
+		strands:       make(map[ReplicaID]EventID),
+		latest:        make(map[ReplicaID]EventID),
+		sends:         make(map[MessageID]*EventNode),
+		timeoutStarts: make(map[string]*EventNode),
+		lock:          new(sync.Mutex),
 
 		latestClocks: make(map[ReplicaID]ClockValue),
 		replicaStore: replicaStore,
@@ -243,6 +245,18 @@ func (d *EventDAG) AddNode(e *Event, parents []*Event) {
 		}
 	}
 
+	if e.IsTimeoutStart() {
+		timeout, _ := e.Timeout()
+		d.timeoutStarts[timeout.Key()] = node
+	} else if e.IsTimeoutEnd() {
+		timeout, _ := e.Timeout()
+		start, ok := d.timeoutStarts[timeout.Key()]
+		if ok {
+			parentNodes = append(parentNodes, start)
+			delete(d.timeoutStarts, timeout.Key())
+		}
+	}
+
 	node.AddParents(parentNodes)
 	node.SetClock(d.nextClock(node, parentNodes))
 
@@ -267,98 +281,16 @@ func (d *EventDAG) MarshalJSON() ([]byte, error) {
 	return json.MarshalIndent(keyvals, "", "\t")
 }
 
-func (d *EventDAG) GetSendNode(e *Event) (*Event, bool) {
-	if !e.IsMessageReceive() {
-		return nil, false
-	}
-	mesageID, _ := e.MessageID()
+func (d *EventDAG) GetLatestNode(replica ReplicaID) (*Event, bool) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
-	node, ok := d.nodes[e.ID]
+	eid, ok := d.latest[replica]
 	if !ok {
 		return nil, false
 	}
-	for _, p := range node.Parents.Iter() {
-		pN := d.nodes[p]
-		if pN.Event.IsMessageSend() {
-			mID, _ := pN.Event.MessageID()
-			if mID == mesageID {
-				return pN.Event, true
-			}
-		}
-	}
-	return nil, false
-}
-
-func (d *EventDAG) GetReceiveNode(e *Event) (*Event, bool) {
-	if !e.IsMessageSend() {
-		return nil, false
-	}
-	mesageID, _ := e.MessageID()
-	d.lock.Lock()
-	defer d.lock.Unlock()
-	node, ok := d.nodes[e.ID]
+	eventNode, ok := d.nodes[eid]
 	if !ok {
 		return nil, false
 	}
-	for _, p := range node.Parents.Iter() {
-		pN := d.nodes[p]
-		if pN.Event.IsMessageReceive() {
-			mID, _ := pN.Event.MessageID()
-			if mID == mesageID {
-				return pN.Event, true
-			}
-		}
-	}
-	return nil, false
-}
-
-func (d *EventDAG) GetTimeoutStart(e *Event) (*Event, bool) {
-	if !e.IsTimeoutEnd() {
-		return nil, false
-	}
-	timeout, _ := e.Timeout()
-	d.lock.Lock()
-	defer d.lock.Unlock()
-	node, ok := d.nodes[e.ID]
-	if !ok {
-		return nil, false
-	}
-	for _, p := range node.Parents.Iter() {
-		pN := d.nodes[p]
-		if pN.Event.IsTimeoutStart() {
-			t, _ := pN.Event.Timeout()
-			if timeout.Eq(t) {
-				return pN.Event, true
-			}
-		}
-	}
-	return nil, false
-}
-
-func (d *EventDAG) GetTimeoutEnd(e *Event) (*Event, bool) {
-	if !e.IsTimeoutStart() {
-		return nil, false
-	}
-	timeout, _ := e.Timeout()
-	d.lock.Lock()
-	defer d.lock.Unlock()
-	node, ok := d.nodes[e.ID]
-	if !ok {
-		return nil, false
-	}
-	for _, p := range node.Parents.Iter() {
-		pN := d.nodes[p]
-		if pN.Event.IsTimeoutEnd() {
-			t, _ := pN.Event.Timeout()
-			if timeout.Eq(t) {
-				return pN.Event, true
-			}
-		}
-	}
-	return nil, false
-}
-
-func (d *EventDAG) GetLatestNode(e *Event) (*Event, bool) {
-	return nil, false
+	return eventNode.Event, true
 }

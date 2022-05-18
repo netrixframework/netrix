@@ -37,7 +37,7 @@ type APIServer struct {
 func NewAPIServer(ctx *context.RootContext, messageParser types.MessageParser, dashboard DashboardRouter) *APIServer {
 
 	server := &APIServer{
-		gen:           util.NewCounter(),
+		gen:           ctx.EventIDGen,
 		ctx:           ctx,
 		addr:          ctx.Config.APIServerAddr,
 		dashboard:     dashboard,

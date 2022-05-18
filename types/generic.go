@@ -1,7 +1,9 @@
 package types
 
 import (
+	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/netrixframework/netrix/log"
 	"golang.org/x/exp/constraints"
@@ -77,6 +79,26 @@ func (s *Map[T, V]) ToMap() map[T]V {
 		m[k] = v
 	}
 	return m
+}
+
+func (s *Map[T, V]) RandomValue() (V, bool) {
+	return s.RandomValueWithSource(rand.NewSource(time.Now().UnixMilli()))
+}
+
+func (s *Map[T, V]) RandomValueWithSource(src rand.Source) (V, bool) {
+	r := rand.New(src)
+
+	s.lock.Lock()
+	keys := make([]T, len(s.m))
+	i := 0
+	for k, _ := range s.m {
+		keys[i] = k
+		i++
+	}
+	s.lock.Unlock()
+
+	rID := keys[r.Intn(len(keys))]
+	return s.Get(rID)
 }
 
 // Clonable is any type which returns a copy of itself on Clone()

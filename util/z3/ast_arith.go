@@ -45,6 +45,17 @@ func (a *AST) Mul(args ...*AST) *AST {
 	}
 }
 
+func (a *AST) Div(other *AST) *AST {
+	return &AST{
+		rawCtx: a.rawCtx,
+		rawAST: C.Z3_mk_div(
+			a.rawCtx,
+			a.rawAST,
+			other.rawAST,
+		),
+	}
+}
+
 // Sub creates an AST node representing subtraction.
 //
 // All AST values must be part of the same context.

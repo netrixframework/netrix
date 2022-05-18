@@ -60,7 +60,7 @@ type logRequest struct {
 func (srv *TestingServer) handlerLogs(c *gin.Context) {
 	var r logRequest
 	if err := c.ShouldBindJSON(&r); err != nil {
-		srv.Logger.With(log.LogParams{"error": err}).Info("Bad replica request")
+		srv.Logger.With(log.LogParams{"error": err}).Debug("Bad replica request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to unmarshal request"})
 		return
 	}

@@ -101,7 +101,7 @@ func (v *VarSet) GetCounter(label string) (*Counter, bool) {
 func (v *VarSet) NewMessageSet(label string) {
 	v.lock.Lock()
 	defer v.lock.Unlock()
-	v.vars[label] = types.NewMap[string, *types.Message]()
+	v.vars[label] = types.NewMap[types.MessageID, *types.Message]()
 }
 
 // GetMessageSet returns the message set at label if one exists (nil, false) otherwise

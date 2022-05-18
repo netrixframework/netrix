@@ -15,8 +15,8 @@ func TestModelAssignments(t *testing.T) {
 	x := ctx.Const(ctx.Symbol("x"), ctx.IntSort())
 
 	// x + 4 = 16
-	ast := x.Add(ctx.Int(4, ctx.IntSort())).
-		Eq(ctx.Int(16, ctx.IntSort()))
+	ast := x.Add(ctx.Int(4)).
+		Eq(ctx.Int(16))
 	t.Logf("\nAST:\n%s", ast.String())
 
 	// Create the solver
@@ -41,7 +41,8 @@ func TestModelAssignments(t *testing.T) {
 	am := m.Assignments()
 	assign := am["x"]
 	t.Logf("Assignment: %s", assign)
-	if assign.Int() != 12 {
+	i, ok := assign.Int()
+	if !ok || i != 12 {
 		t.Fatalf("bad: %s", assign)
 	}
 }
@@ -57,8 +58,8 @@ func TestModelEval(t *testing.T) {
 	x := ctx.Const(ctx.Symbol("x"), ctx.IntSort())
 
 	// x + 4 = 16
-	ast := x.Add(ctx.Int(4, ctx.IntSort())).
-		Eq(ctx.Int(16, ctx.IntSort()))
+	ast := x.Add(ctx.Int(4)).
+		Eq(ctx.Int(16))
 	t.Logf("\nAST:\n%s", ast.String())
 
 	// Create the solver
@@ -82,7 +83,8 @@ func TestModelEval(t *testing.T) {
 	// Get the exact value
 	assign := m.Eval(x)
 	t.Logf("Assignment: %s", assign)
-	if assign.Int() != 12 {
+	i, ok := assign.Int()
+	if !ok || i != 12 {
 		t.Fatalf("bad: %s", assign)
 	}
 }

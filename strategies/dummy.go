@@ -47,3 +47,7 @@ func (d *DummyStrategy) Step(event *types.Event, c *Context) Action {
 func (d *DummyStrategy) NextIteration() {
 
 }
+
+func (d *DummyStrategy) Finalize() {
+
+}
