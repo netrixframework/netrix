@@ -96,6 +96,10 @@ func (s *Map[T, V]) RandomValueWithSource(src rand.Source) (V, bool) {
 		i++
 	}
 	s.lock.Unlock()
+	if len(keys) == 0 {
+		var r V
+		return r, false
+	}
 
 	rID := keys[r.Intn(len(keys))]
 	return s.Get(rID)

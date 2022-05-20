@@ -29,13 +29,14 @@ type TimeoutStrategyConfig struct {
 	MaxMessageDelay time.Duration
 	// DelayDistribution is the distribution from which message delay values will be sampled
 	DelayDistribution Distribution
+	// Nondeterministic will fire timeouts randomly ignoring the timeout duration
+	Nondeterministic bool
+	// SpuriousCheck will enable checking for spuriousness when firing non deterministically
+	SpuriousCheck bool
 }
 
-func (c *TimeoutStrategyConfig) delayValue() int {
-	if c.MaxMessageDelay <= 0 {
-		return c.DelayDistribution.Rand()
-	}
-	return int(c.MaxMessageDelay.Milliseconds())
+func (c *TimeoutStrategyConfig) UseDistribution() bool {
+	return c.MaxMessageDelay <= 0
 }
 
 func (c *TimeoutStrategyConfig) validate() error {
@@ -73,6 +74,8 @@ type TimeoutStrategy struct {
 	pendingEventCtr *util.Counter
 	config          *TimeoutStrategyConfig
 
+	normalTimer *timer
+
 	z3config  *z3.Config
 	z3context *z3.Context
 	z3solver  *z3.Solver
@@ -88,7 +91,7 @@ func NewTimeoutStrategy(config *TimeoutStrategyConfig) (*TimeoutStrategy, error)
 	z3config := z3.NewConfig()
 	z3context := z3.NewContext(z3config)
 
-	return &TimeoutStrategy{
+	strat := &TimeoutStrategy{
 		pendingEvents:   types.NewMap[string, *pendingEvent](),
 		symbolMap:       types.NewMap[string, *z3.AST](),
 		pendingEventCtr: util.NewCounter(),
@@ -97,12 +100,14 @@ func NewTimeoutStrategy(config *TimeoutStrategyConfig) (*TimeoutStrategy, error)
 		z3context:       z3context,
 		z3solver:        z3context.NewSolver(),
 		BaseService:     types.NewBaseService("TimeoutStrategy", nil),
-	}, nil
+	}
+	if !config.Nondeterministic {
+		strat.normalTimer = newTimer()
+	}
+	return strat, nil
 }
 
 func (t *TimeoutStrategy) Step(e *types.Event, ctx *strategies.Context) strategies.Action {
-	// TODO: fill this up
-
 	if !t.Running() {
 		return strategies.DoNothing()
 	}
@@ -112,28 +117,43 @@ func (t *TimeoutStrategy) Step(e *types.Event, ctx *strategies.Context) strategi
 		// Panic
 		return strategies.DoNothing()
 	}
+	if !t.config.Nondeterministic {
+		actions := make([]strategies.Action, 0)
+		if e.IsMessageSend() {
+			mID, _ := e.MessageID()
+			message, ok := ctx.Messages.Get(mID)
+			if ok {
+				actions = append(actions, strategies.DeliverMessage(message))
+			}
+		} else if e.IsTimeoutStart() {
+			timeout, _ := e.Timeout()
+			t.normalTimer.Add(timeout)
+		}
+		for _, t := range t.normalTimer.Ready() {
+			actions = append(actions, FireTimeout(t))
+		}
+		if len(actions) == 0 {
+			return strategies.DoNothing()
+		}
+		return strategies.ActionSequence(actions...)
+	}
+
 	// 2. Update pending events
 	t.updatePendingEvents(e, ctx)
 
 	// 3. Pick a random event and check if its the least
-	if p := t.findRandomPendingEvent(ctx); p != nil {
+	if p, ok := t.findRandomPendingEvent(ctx); ok {
 		// Found a candidate event
 		if p.timeout != nil {
 			t.Logger.With(log.LogParams{
 				"timeout": p.timeout.Key(),
 			}).Debug("firing timeout")
+			return FireTimeout(p.timeout)
 		} else if p.message != nil {
 			t.Logger.With(log.LogParams{
 				"message_id": p.message.ID,
 			}).Debug("delivering message")
-		}
-	}
-
-	if e.IsMessageSend() {
-		messageID, _ := e.MessageID()
-		message, ok := ctx.Messages.Get(messageID)
-		if ok {
-			return strategies.DeliverMessage(message)
+			return strategies.DeliverMessage(p.message)
 		}
 	}
 	return strategies.DoNothing()
@@ -161,8 +181,21 @@ func (t *TimeoutStrategy) updateConstraints(e *types.Event, ctx *strategies.Cont
 			constraints = append(
 				constraints,
 				pSymbol.Mul(t.config.driftMin(t.z3context)).Sub(eSymbol).Le(t.z3context.Int(0)),
-				eSymbol.Sub(pSymbol.Mul(t.config.driftMax(t.z3context))).Le(t.z3context.Int(t.config.delayValue())),
 			)
+			if t.config.UseDistribution() {
+				delayVal := t.config.DelayDistribution.Rand()
+				constraints = append(
+					constraints,
+					eSymbol.Sub(pSymbol.Mul(t.config.driftMax(t.z3context))).Eq(t.z3context.Int(delayVal)),
+				)
+			} else {
+				delayVal := int(t.config.MaxMessageDelay.Milliseconds())
+				constraints = append(
+					constraints,
+					eSymbol.Sub(pSymbol.Mul(t.config.driftMax(t.z3context))).Le(t.z3context.Int(delayVal)),
+				)
+			}
+
 		} else if pNode.Event.IsTimeoutStart() && e.IsTimeoutEnd() {
 			// Add constraints for timeout end
 			timeout, _ := e.Timeout()
@@ -189,6 +222,12 @@ func (t *TimeoutStrategy) Finalize() {
 }
 
 func (t *TimeoutStrategy) NextIteration() {
+
+	// Record metrics about current iteration
+
+	if !t.config.Nondeterministic {
+		t.normalTimer.EndAll()
+	}
 	t.pendingEvents.RemoveAll()
 	t.pendingEventCtr.Reset()
 	t.symbolMap.RemoveAll()
@@ -206,6 +245,11 @@ func (t *TimeoutStrategy) Start() error {
 }
 
 func (t *TimeoutStrategy) Stop() error {
+
+	if !t.config.Nondeterministic {
+		t.normalTimer.EndAll()
+	}
+
 	if t.z3solver != nil {
 		t.z3solver.Close()
 	}

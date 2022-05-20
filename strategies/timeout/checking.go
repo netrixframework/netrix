@@ -7,7 +7,11 @@ import (
 	"github.com/netrixframework/netrix/util/z3"
 )
 
-func (t *TimeoutStrategy) findRandomPendingEvent(ctx *strategies.Context) *pendingEvent {
+func (t *TimeoutStrategy) findRandomPendingEvent(ctx *strategies.Context) (*pendingEvent, bool) {
+	if !t.config.SpuriousCheck {
+		return t.pendingEvents.RandomValue()
+	}
+
 	solver := t.z3solver
 	solver.Push()
 	for _, p := range t.pendingEvents.IterValues() {
@@ -41,5 +45,5 @@ func (t *TimeoutStrategy) findRandomPendingEvent(ctx *strategies.Context) *pendi
 		}
 	}
 	solver.Pop(1)
-	return randomEvent
+	return randomEvent, true
 }

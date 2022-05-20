@@ -33,8 +33,20 @@ func (t *TimeoutStrategy) updatePendingEvents(e *types.Event, ctx *strategies.Co
 		pEvent.constraints = append(
 			pEvent.constraints,
 			sendSymbol.Mul(t.config.driftMin(t.z3context)).Sub(receiveSymbol).Le(t.z3context.Int(0)),
-			receiveSymbol.Sub(sendSymbol.Mul(t.config.driftMax(t.z3context))).Le(t.z3context.Int(t.config.delayValue())),
 		)
+		if t.config.UseDistribution() {
+			delayVal := t.config.DelayDistribution.Rand()
+			pEvent.constraints = append(
+				pEvent.constraints,
+				receiveSymbol.Sub(sendSymbol.Mul(t.config.driftMax(t.z3context))).Eq(t.z3context.Int(delayVal)),
+			)
+		} else {
+			delayVal := int(t.config.MaxMessageDelay.Milliseconds())
+			pEvent.constraints = append(
+				pEvent.constraints,
+				receiveSymbol.Sub(sendSymbol.Mul(t.config.driftMax(t.z3context))).Le(t.z3context.Int(delayVal)),
+			)
+		}
 	} else if e.IsTimeoutStart() {
 		timeout, _ := e.Timeout()
 		pEvent = &pendingEvent{
