@@ -59,12 +59,10 @@ func (a *AST) Div(other *AST) *AST {
 // Sub creates an AST node representing subtraction.
 //
 // All AST values must be part of the same context.
-func (a *AST) Sub(args ...*AST) *AST {
-	raws := make([]C.Z3_ast, len(args)+1)
+func (a *AST) Sub(other *AST) *AST {
+	raws := make([]C.Z3_ast, 2)
 	raws[0] = a.rawAST
-	for i, arg := range args {
-		raws[i+1] = arg.rawAST
-	}
+	raws[1] = other.rawAST
 
 	return &AST{
 		rawCtx: a.rawCtx,

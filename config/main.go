@@ -46,7 +46,7 @@ type LogConfig struct {
 	Level string `json:"level"`
 }
 
-// PatseConfig parses config from the specificied file
+// ParseConfig parses config from the specified file
 func ParseConfig(path string) (*Config, error) {
 	bytes, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -64,7 +64,7 @@ func ParseConfig(path string) (*Config, error) {
 	}
 	err = json.Unmarshal(bytes, &defaultConfig)
 	if err != nil {
-		return nil, fmt.Errorf("error unmarshalling config: %s", err)
+		return nil, fmt.Errorf("error parsing config: %s", err)
 	}
 	json.Unmarshal(bytes, &defaultConfig.Raw)
 	return defaultConfig, nil

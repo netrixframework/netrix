@@ -89,25 +89,23 @@ func (c *Context) Const(s *Symbol, typ *Sort) *AST {
 	}
 }
 
-func (c *Context) cons(s C.Z3_symbol, sort C.Z3_sort) *AST {
-	return &AST{
-		rawCtx: c.raw,
-		rawAST: C.Z3_mk_const(c.raw, s, sort),
-	}
-}
-
 func (c *Context) IntConst(label string) *AST {
 	name := C.CString(label)
 	defer C.free(unsafe.Pointer(name))
 
-	return c.cons(C.Z3_mk_string_symbol(c.raw, name), C.Z3_mk_int_sort(c.raw))
+	return &AST{
+		rawCtx: c.raw,
+		rawAST: C.Z3_mk_const(c.raw, C.Z3_mk_string_symbol(c.raw, name), C.Z3_mk_int_sort(c.raw)),
+	}
 }
 
 func (c *Context) RealConst(label string) *AST {
 	name := C.CString(label)
 	defer C.free(unsafe.Pointer(name))
-
-	return c.cons(C.Z3_mk_string_symbol(c.raw, name), C.Z3_mk_real_sort(c.raw))
+	return &AST{
+		rawCtx: c.raw,
+		rawAST: C.Z3_mk_const(c.raw, C.Z3_mk_string_symbol(c.raw, name), C.Z3_mk_real_sort(c.raw)),
+	}
 }
 
 // Int creates an integer type.

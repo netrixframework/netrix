@@ -24,12 +24,20 @@ type Driver struct {
 	receiveEvents bool
 	config        *config.StrategyConfig
 	strategyCtx   *Context
+	setupFunc     func(*Context) error
+	stepFunc      func(*types.Event, *Context)
 	lock          *sync.Mutex
 
 	*types.BaseService
 }
 
-func NewStrategyDriver(config *config.Config, mp types.MessageParser, strategy Strategy) *Driver {
+func NewStrategyDriver(
+	config *config.Config,
+	mp types.MessageParser,
+	strategy Strategy,
+	setupFunc func(*Context) error,
+	stepFunc func(*types.Event, *Context),
+) *Driver {
 	log.Init(config.LogConfig)
 	ctx := context.NewRootContext(config, log.DefaultLogger)
 	d := &Driver{
@@ -40,6 +48,8 @@ func NewStrategyDriver(config *config.Config, mp types.MessageParser, strategy S
 		config:        &config.StrategyConfig,
 		strategyCtx:   nil,
 		BaseService:   types.NewBaseService("StrategyDriver", ctx.Logger),
+		setupFunc:     setupFunc,
+		stepFunc:      stepFunc,
 		receiveEvents: false,
 		lock:          new(sync.Mutex),
 	}
@@ -59,7 +69,7 @@ func (d *Driver) Start() error {
 	if err := d.main(); err != nil {
 		return err
 	}
-
+	d.Logger.Info("completed all iterations")
 	<-d.QuitCh()
 	return nil
 }
@@ -84,6 +94,7 @@ func (d *Driver) poll() {
 		select {
 		case event := <-d.eventCh:
 			d.strategyCtx.EventDAG.AddNode(event, []*types.Event{})
+			d.stepFunc(event, d.strategyCtx)
 			go d.performAction(
 				d.strategy.Step(
 					event,
@@ -117,24 +128,26 @@ func (d *Driver) main() error {
 		if err := d.waitForReplicas(true); err != nil {
 			return err
 		}
+		d.setupFunc(d.strategyCtx)
 		d.unblockEvents()
 
 		d.Logger.Info(fmt.Sprintf("Starting iteration %d", d.strategyCtx.CurIteration()))
 		select {
 		case <-d.strategy.QuitCh():
+			return nil
 		case <-d.QuitCh():
 			return nil
-
 		case <-time.After(d.config.IterationTimeout):
 		}
 		d.blockEvents()
 
 		d.strategyCtx.NextIteration()
-		d.strategy.NextIteration()
+		d.strategy.NextIteration(d.strategyCtx)
 		d.ctx.Reset()
 
 		d.dispatcher.RestartAll()
 	}
+	d.strategy.Finalize(d.strategyCtx)
 	return nil
 }
 

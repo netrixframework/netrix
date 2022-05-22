@@ -3,6 +3,7 @@ package timeout
 import (
 	"fmt"
 
+	"github.com/netrixframework/netrix/log"
 	"github.com/netrixframework/netrix/strategies"
 	"github.com/netrixframework/netrix/types"
 	"github.com/netrixframework/netrix/util/z3"
@@ -20,7 +21,11 @@ func (t *TimeoutStrategy) updatePendingEvents(e *types.Event, ctx *strategies.Co
 	var pEvent *pendingEvent = nil
 	if e.IsMessageSend() {
 		messageID, _ := e.MessageID()
-		message, _ := ctx.Messages.Get(messageID)
+		message, ok := ctx.Messages.Get(messageID)
+		if !ok {
+			t.Logger.With(log.LogParams{"message_id": messageID}).Info("no message found!")
+			return
+		}
 		pEvent = &pendingEvent{
 			label:       fmt.Sprintf("pe_%d", t.pendingEventCtr.Next()),
 			replica:     message.To,

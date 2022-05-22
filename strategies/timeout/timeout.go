@@ -3,6 +3,7 @@ package timeout
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/netrixframework/netrix/dispatcher"
@@ -75,10 +76,12 @@ type TimeoutStrategy struct {
 	config          *TimeoutStrategyConfig
 
 	normalTimer *timer
+	records     *records
 
-	z3config  *z3.Config
-	z3context *z3.Context
-	z3solver  *z3.Solver
+	z3config   *z3.Config
+	z3context  *z3.Context
+	z3solver   *z3.Solver
+	solverLock *sync.Mutex
 	*types.BaseService
 }
 
@@ -91,27 +94,29 @@ func NewTimeoutStrategy(config *TimeoutStrategyConfig) (*TimeoutStrategy, error)
 	z3config := z3.NewConfig()
 	z3context := z3.NewContext(z3config)
 
-	strat := &TimeoutStrategy{
+	strategy := &TimeoutStrategy{
 		pendingEvents:   types.NewMap[string, *pendingEvent](),
 		symbolMap:       types.NewMap[string, *z3.AST](),
 		pendingEventCtr: util.NewCounter(),
 		config:          config,
+		records:         newRecords(),
 		z3config:        z3config,
 		z3context:       z3context,
 		z3solver:        z3context.NewSolver(),
+		solverLock:      new(sync.Mutex),
 		BaseService:     types.NewBaseService("TimeoutStrategy", nil),
 	}
 	if !config.Nondeterministic {
-		strat.normalTimer = newTimer()
+		strategy.normalTimer = newTimer()
 	}
-	return strat, nil
+	return strategy, nil
 }
 
 func (t *TimeoutStrategy) Step(e *types.Event, ctx *strategies.Context) strategies.Action {
 	if !t.Running() {
 		return strategies.DoNothing()
 	}
-
+	t.records.step(ctx)
 	// 1. Update constraints (add e to the graph and update the set of constraints in the solver)
 	if !t.updateConstraints(e, ctx) {
 		// Panic
@@ -175,7 +180,10 @@ func (t *TimeoutStrategy) updateConstraints(e *types.Event, ctx *strategies.Cont
 			continue
 		}
 		key := fmt.Sprintf("e_%d", pID)
-		pSymbol, _ := t.symbolMap.Get(key)
+		pSymbol, ok := t.symbolMap.Get(key)
+		if !ok {
+			continue
+		}
 		if pNode.Event.IsMessageSend() && e.IsMessageReceive() {
 			// Add constraints for message receive
 			constraints = append(
@@ -211,32 +219,39 @@ func (t *TimeoutStrategy) updateConstraints(e *types.Event, ctx *strategies.Cont
 			)
 		}
 	}
+	t.solverLock.Lock()
 	for _, c := range constraints {
 		t.z3solver.Assert(c)
 	}
+	t.solverLock.Unlock()
 	return true
 }
 
-func (t *TimeoutStrategy) Finalize() {
-
+func (t *TimeoutStrategy) Finalize(c *strategies.Context) {
+	t.records.summarize(c)
 }
 
-func (t *TimeoutStrategy) NextIteration() {
+func (t *TimeoutStrategy) NextIteration(ctx *strategies.Context) {
 
 	// Record metrics about current iteration
-
 	if !t.config.Nondeterministic {
 		t.normalTimer.EndAll()
 	}
 	t.pendingEvents.RemoveAll()
 	t.pendingEventCtr.Reset()
 	t.symbolMap.RemoveAll()
-	t.z3solver.Close()
-	t.z3context.Close()
-	t.z3config.Close()
-	t.z3config = z3.NewConfig()
-	t.z3context = z3.NewContext(t.z3config)
+
+	t.solverLock.Lock()
+	if t.z3solver != nil {
+		spurious := false
+		if t.z3solver.Check() == z3.False {
+			spurious = true
+		}
+		t.records.newIteration(spurious, ctx.CurIteration())
+		t.z3solver.Close()
+	}
 	t.z3solver = t.z3context.NewSolver()
+	t.solverLock.Unlock()
 }
 
 func (t *TimeoutStrategy) Start() error {

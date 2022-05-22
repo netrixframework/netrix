@@ -91,7 +91,7 @@ func (s *Map[T, V]) RandomValueWithSource(src rand.Source) (V, bool) {
 	s.lock.Lock()
 	keys := make([]T, len(s.m))
 	i := 0
-	for k, _ := range s.m {
+	for k := range s.m {
 		keys[i] = k
 		i++
 	}
@@ -134,22 +134,22 @@ func NewQueue[V Clonable](logger *log.Logger) *Queue[V] {
 // Start implements Service
 func (q *Queue[V]) Start() error {
 	q.StartRunning()
-	go q.dispatchloop()
+	go q.dispatchLoop()
 	return nil
 }
 
-func (q *Queue[V]) dispatchloop() {
+func (q *Queue[V]) dispatchLoop() {
 	for {
 		q.lock.Lock()
 		size := q.size
 		vals := q.vals
-		subcribers := q.subscribers
+		subscribers := q.subscribers
 		q.lock.Unlock()
 
 		if size > 0 {
 			toAdd := vals[0]
 
-			for _, s := range subcribers {
+			for _, s := range subscribers {
 				q.dispatchWG.Add(1)
 				go func(subs chan V) {
 					select {

@@ -38,6 +38,7 @@ func newTimer() *timer {
 	return &timer{
 		timeouts:     make(map[string]*timeout),
 		doneTimeouts: make([]*types.ReplicaTimeout, 0),
+		lock:         new(sync.Mutex),
 	}
 }
 

@@ -41,7 +41,7 @@ func (c *Context) NextIteration() {
 	defer c.lock.Unlock()
 
 	c.curIteration++
-	c.EventDAG = types.NewEventDag(c.Replicas)
+	c.EventDAG.Reset()
 }
 
 type Action struct {
@@ -90,6 +90,6 @@ func ActionSequence(actions ...Action) Action {
 type Strategy interface {
 	types.Service
 	Step(*types.Event, *Context) Action
-	NextIteration()
-	Finalize()
+	NextIteration(*Context)
+	Finalize(*Context)
 }

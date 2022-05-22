@@ -11,6 +11,8 @@ func (t *TimeoutStrategy) findRandomPendingEvent(ctx *strategies.Context) (*pend
 	if !t.config.SpuriousCheck {
 		return t.pendingEvents.RandomValue()
 	}
+	t.solverLock.Lock()
+	defer t.solverLock.Unlock()
 
 	solver := t.z3solver
 	solver.Push()
