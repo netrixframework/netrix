@@ -6,9 +6,8 @@ require (
 	github.com/gin-gonic/gin v1.7.7
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.3.0
+	gonum.org/v1/gonum v0.11.0
 )
-
-require github.com/google/go-cmp v0.5.7 // indirect
 
 require (
 	github.com/gin-contrib/sse v0.1.0 // indirect

@@ -35,11 +35,13 @@ var errorHandlerMapLock sync.RWMutex
 // SetErrorHandler registers the error handler. This handler is invoked
 // whenever an error occurs within Z3.
 func (c *Context) SetErrorHandler(f ErrorHandler) {
-	C.Z3_set_error_handler(c.raw, C._go_z3_error_handler())
+	c.Mutex.Lock()
+	C.Z3_set_error_handler(c.Raw, C._go_z3_error_handler())
 
 	errorHandlerMapLock.Lock()
 	defer errorHandlerMapLock.Unlock()
-	errorHandlerMap[c.raw] = f
+	errorHandlerMap[c.Raw] = f
+	c.Mutex.Unlock()
 }
 
 // Error returns the error message for the given error code.
@@ -50,7 +52,9 @@ func (c *Context) SetErrorHandler(f ErrorHandler) {
 //
 // Maps: Z3_get_error_msg_ex
 func (c *Context) Error(code ErrorCode) string {
-	return C.GoString(C.Z3_get_error_msg(c.raw, C.Z3_error_code(code)))
+	c.Mutex.Lock()
+	defer c.Mutex.Unlock()
+	return C.GoString(C.Z3_get_error_msg(c.Raw, C.Z3_error_code(code)))
 }
 
 //export goZ3ErrorHandler
@@ -65,5 +69,5 @@ func goZ3ErrorHandler(raw C.Z3_context, code C.Z3_error_code) {
 	}
 
 	// Call it!
-	f(&Context{raw: raw}, ErrorCode(code))
+	f(&Context{Raw: raw}, ErrorCode(code))
 }

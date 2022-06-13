@@ -8,27 +8,33 @@ import (
 import "C"
 
 type Optimizer struct {
-	rawCtx C.Z3_context
+	ctx    *Context
 	rawOpt C.Z3_optimize
 }
 
 func (c *Context) NewOptimizer() *Optimizer {
-	rawOpt := C.Z3_mk_optimize(c.raw)
-	C.Z3_optimize_inc_ref(c.raw, rawOpt)
+	c.Mutex.Lock()
+	rawOpt := C.Z3_mk_optimize(c.Raw)
+	C.Z3_optimize_inc_ref(c.Raw, rawOpt)
+	c.Mutex.Unlock()
 
 	return &Optimizer{
-		rawCtx: c.raw,
+		ctx:    c,
 		rawOpt: rawOpt,
 	}
 }
 
 func (o *Optimizer) Close() error {
-	C.Z3_optimize_dec_ref(o.rawCtx, o.rawOpt)
+	o.ctx.Lock()
+	C.Z3_optimize_dec_ref(o.ctx.Raw, o.rawOpt)
+	o.ctx.Unlock()
 	return nil
 }
 
 func (o *Optimizer) Assert(a *AST) {
-	C.Z3_optimize_assert(o.rawCtx, o.rawOpt, a.rawAST)
+	o.ctx.Lock()
+	C.Z3_optimize_assert(o.ctx.Raw, o.rawOpt, a.rawAST)
+	o.ctx.Unlock()
 }
 
 type OptimizedValue struct {
@@ -38,16 +44,22 @@ type OptimizedValue struct {
 }
 
 func (o *OptimizedValue) lower() (float64, bool) {
+	ctx := o.opt.ctx
+	ctx.Lock()
+	defer ctx.Unlock()
 	return (&AST{
-		rawCtx: o.opt.rawCtx,
-		rawAST: C.Z3_optimize_get_lower(o.opt.rawCtx, o.opt.rawOpt, C.uint(o.index)),
+		ctx:    ctx,
+		rawAST: C.Z3_optimize_get_lower(ctx.Raw, o.opt.rawOpt, C.uint(o.index)),
 	}).Float()
 }
 
 func (o *OptimizedValue) upper() (float64, bool) {
+	ctx := o.opt.ctx
+	ctx.Lock()
+	defer ctx.Unlock()
 	return (&AST{
-		rawCtx: o.opt.rawCtx,
-		rawAST: C.Z3_optimize_get_upper(o.opt.rawCtx, o.opt.rawOpt, C.uint(o.index)),
+		ctx:    ctx,
+		rawAST: C.Z3_optimize_get_upper(ctx.Raw, o.opt.rawOpt, C.uint(o.index)),
 	}).Float()
 }
 
@@ -59,17 +71,21 @@ func (o *OptimizedValue) Value() (float64, bool) {
 }
 
 func (o *Optimizer) Maximize(a *AST) *OptimizedValue {
+	o.ctx.Lock()
+	defer o.ctx.Unlock()
 	return &OptimizedValue{
 		opt:   o,
-		index: uint(C.Z3_optimize_maximize(o.rawCtx, o.rawOpt, a.rawAST)),
+		index: uint(C.Z3_optimize_maximize(o.ctx.Raw, o.rawOpt, a.rawAST)),
 		max:   true,
 	}
 }
 
 func (o *Optimizer) Minimize(a *AST) *OptimizedValue {
+	o.ctx.Lock()
+	defer o.ctx.Unlock()
 	return &OptimizedValue{
 		opt:   o,
-		index: uint(C.Z3_optimize_minimize(o.rawCtx, o.rawOpt, a.rawAST)),
+		index: uint(C.Z3_optimize_minimize(o.ctx.Raw, o.rawOpt, a.rawAST)),
 		max:   false,
 	}
 }
@@ -79,8 +95,10 @@ func (o *Optimizer) Check(assumptions ...*AST) LBool {
 	for i, a := range assumptions {
 		raws[i] = a.rawAST
 	}
+	o.ctx.Lock()
+	defer o.ctx.Unlock()
 	return LBool(C.Z3_optimize_check(
-		o.rawCtx,
+		o.ctx.Raw,
 		o.rawOpt,
 		C.uint(len(assumptions)),
 		(*C.Z3_ast)(unsafe.Pointer(&raws[0])),
@@ -88,18 +106,24 @@ func (o *Optimizer) Check(assumptions ...*AST) LBool {
 }
 
 func (o *Optimizer) Push() {
-	C.Z3_optimize_push(o.rawCtx, o.rawOpt)
+	o.ctx.Lock()
+	C.Z3_optimize_push(o.ctx.Raw, o.rawOpt)
+	o.ctx.Unlock()
 }
 
 func (o *Optimizer) Pop() {
-	C.Z3_optimize_pop(o.rawCtx, o.rawOpt)
+	o.ctx.Lock()
+	C.Z3_optimize_pop(o.ctx.Raw, o.rawOpt)
+	o.ctx.Unlock()
 }
 
 func (o *Optimizer) Model() *Model {
+	o.ctx.Lock()
 	m := &Model{
-		rawCtx:   o.rawCtx,
-		rawModel: C.Z3_optimize_get_model(o.rawCtx, o.rawOpt),
+		ctx:      o.ctx,
+		rawModel: C.Z3_optimize_get_model(o.ctx.Raw, o.rawOpt),
 	}
+	o.ctx.Unlock()
 	m.IncRef()
 	return m
 }

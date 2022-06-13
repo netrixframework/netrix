@@ -2,6 +2,7 @@ package z3
 
 // #include "go-z3.h"
 import "C"
+import "sync"
 
 // Solver is a single solver tied to a specific Context within Z3.
 //
@@ -13,24 +14,32 @@ import "C"
 // Freeing the context (Context.Close) will NOT automatically close associated
 // solvers. They must be managed separately.
 type Solver struct {
-	rawCtx    C.Z3_context
+	ctx       *Context
 	rawSolver C.Z3_solver
+	lock      *sync.Mutex
 }
 
 // NewSolver creates a new solver.
 func (c *Context) NewSolver() *Solver {
-	rawSolver := C.Z3_mk_solver(c.raw)
-	C.Z3_solver_inc_ref(c.raw, rawSolver)
+	c.Mutex.Lock()
+	rawSolver := C.Z3_mk_solver(c.Raw)
+	C.Z3_solver_inc_ref(c.Raw, rawSolver)
+	c.Mutex.Unlock()
 
 	return &Solver{
 		rawSolver: rawSolver,
-		rawCtx:    c.raw,
+		ctx:       c,
+		lock:      new(sync.Mutex),
 	}
 }
 
 // Close frees the memory associated with this.
 func (s *Solver) Close() error {
-	C.Z3_solver_dec_ref(s.rawCtx, s.rawSolver)
+	s.ctx.Lock()
+	s.lock.Lock()
+	C.Z3_solver_dec_ref(s.ctx.Raw, s.rawSolver)
+	s.lock.Unlock()
+	s.ctx.Unlock()
 	return nil
 }
 
@@ -38,32 +47,64 @@ func (s *Solver) Close() error {
 //
 // Maps to: Z3_solver_assert
 func (s *Solver) Assert(a *AST) {
-	C.Z3_solver_assert(s.rawCtx, s.rawSolver, a.rawAST)
+	s.ctx.Lock()
+	s.lock.Lock()
+	C.Z3_solver_assert(s.ctx.Raw, s.rawSolver, a.rawAST)
+	s.lock.Unlock()
+	s.ctx.Unlock()
 }
 
 // Check checks if the currently set formula is consistent.
 //
 // Maps to: Z3_solver_check
 func (s *Solver) Check() LBool {
-	return LBool(C.Z3_solver_check(s.rawCtx, s.rawSolver))
+	s.ctx.Lock()
+	s.lock.Lock()
+	check := C.Z3_solver_check(s.ctx.Raw, s.rawSolver)
+	s.lock.Unlock()
+	s.ctx.Unlock()
+	return LBool(check)
 }
 
 // Model returns the last model from a Check.
 //
 // Maps to: Z3_solver_get_model
 func (s *Solver) Model() *Model {
+	s.ctx.Lock()
+	s.lock.Lock()
 	m := &Model{
-		rawCtx:   s.rawCtx,
-		rawModel: C.Z3_solver_get_model(s.rawCtx, s.rawSolver),
+		ctx:      s.ctx,
+		rawModel: C.Z3_solver_get_model(s.ctx.Raw, s.rawSolver),
 	}
+	s.lock.Unlock()
+	s.ctx.Unlock()
 	m.IncRef()
 	return m
 }
 
 func (s *Solver) Push() {
-	C.Z3_solver_push(s.rawCtx, s.rawSolver)
+	s.ctx.Lock()
+	s.lock.Lock()
+	C.Z3_solver_push(s.ctx.Raw, s.rawSolver)
+	s.lock.Unlock()
+	s.ctx.Unlock()
 }
 
 func (s *Solver) Pop(b uint) {
-	C.Z3_solver_pop(s.rawCtx, s.rawSolver, C.uint(b))
+	s.ctx.Lock()
+	s.lock.Lock()
+	C.Z3_solver_pop(s.ctx.Raw, s.rawSolver, C.uint(b))
+	s.lock.Unlock()
+	s.ctx.Unlock()
+}
+
+func (s *Solver) Reset() {
+	s.ctx.Lock()
+	s.lock.Lock()
+	C.Z3_solver_dec_ref(s.ctx.Raw, s.rawSolver)
+	rawSolver := C.Z3_mk_solver(s.ctx.Raw)
+	C.Z3_solver_inc_ref(s.ctx.Raw, rawSolver)
+	s.rawSolver = rawSolver
+	s.lock.Unlock()
+	s.ctx.Unlock()
 }

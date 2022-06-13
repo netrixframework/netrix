@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"time"
 )
 
 var (
@@ -22,18 +21,8 @@ type Config struct {
 	APIServerAddr string `json:"server_addr"`
 	// LogConfig configuration for logging
 	LogConfig LogConfig `json:"log"`
-	// Strategy config
-	StrategyConfig StrategyConfig `json:"strategy"`
 	// The raw json of the config
 	Raw map[string]interface{} `json:"-"`
-}
-
-// StrategyConfig store the config used for running strategies
-type StrategyConfig struct {
-	// Iterations the number of iterations to be run
-	Iterations int `json:"iterations"`
-	// IterationTimeout timeout for each iteration
-	IterationTimeout time.Duration `json:"iteration_timeout"`
 }
 
 // LogConfig stores the config for logging purpose

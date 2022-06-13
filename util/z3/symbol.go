@@ -11,7 +11,7 @@ import "C"
 
 // Symbol represents a named
 type Symbol struct {
-	rawCtx    C.Z3_context
+	ctx       *Context
 	rawSymbol C.Z3_symbol
 }
 
@@ -22,9 +22,12 @@ func (c *Context) Symbol(name string) *Symbol {
 	ns := C.CString(name)
 	defer C.free(unsafe.Pointer(ns))
 
+	c.Mutex.Lock()
+	defer c.Mutex.Unlock()
+
 	return &Symbol{
-		rawCtx:    c.raw,
-		rawSymbol: C.Z3_mk_string_symbol(c.raw, ns),
+		ctx:       c,
+		rawSymbol: C.Z3_mk_string_symbol(c.Raw, ns),
 	}
 }
 
@@ -32,9 +35,11 @@ func (c *Context) Symbol(name string) *Symbol {
 //
 // The memory associated with this symbol is freed when the context is freed.
 func (c *Context) SymbolInt(name int) *Symbol {
+	c.Mutex.Lock()
+	defer c.Mutex.Unlock()
 	return &Symbol{
-		rawCtx:    c.raw,
-		rawSymbol: C.Z3_mk_int_symbol(c.raw, C.int(name)),
+		ctx:       c,
+		rawSymbol: C.Z3_mk_int_symbol(c.Raw, C.int(name)),
 	}
 }
 
@@ -42,15 +47,17 @@ func (c *Context) SymbolInt(name int) *Symbol {
 // of symbol it is. If it is an int, it will be converted to a string
 // result.
 func (s *Symbol) String() string {
-	switch C.Z3_get_symbol_kind(s.rawCtx, s.rawSymbol) {
+	s.ctx.Lock()
+	defer s.ctx.Unlock()
+	switch C.Z3_get_symbol_kind(s.ctx.Raw, s.rawSymbol) {
 	case C.Z3_INT_SYMBOL:
 		return strconv.FormatInt(
-			int64(C.Z3_get_symbol_int(s.rawCtx, s.rawSymbol)), 10)
+			int64(C.Z3_get_symbol_int(s.ctx.Raw, s.rawSymbol)), 10)
 
 	case C.Z3_STRING_SYMBOL:
 		// We don't need to free this value since it uses statically allocated
 		// space that is reused by Z3. The GoString call will copy the memory.
-		return C.GoString(C.Z3_get_symbol_string(s.rawCtx, s.rawSymbol))
+		return C.GoString(C.Z3_get_symbol_string(s.ctx.Raw, s.rawSymbol))
 
 	default:
 		return "unknown symbol kind"

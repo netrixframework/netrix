@@ -15,13 +15,15 @@ import "C"
 // When a model is initialized (via Solver.Model for example), it always has
 // a reference count of 1. You must call Close when you're done.
 type Model struct {
-	rawCtx   C.Z3_context
+	ctx      *Context
 	rawModel C.Z3_model
 }
 
 // String returns a human-friendly string version of the model.
 func (m *Model) String() string {
-	return C.GoString(C.Z3_model_to_string(m.rawCtx, m.rawModel))
+	m.ctx.Lock()
+	defer m.ctx.Unlock()
+	return C.GoString(C.Z3_model_to_string(m.ctx.Raw, m.rawModel))
 }
 
 //-------------------------------------------------------------------
@@ -40,12 +42,14 @@ func (m *Model) String() string {
 // Maps: Z3_model_eval
 func (m *Model) Eval(c *AST) *AST {
 	var result C.Z3_ast
-	if C._Z3_model_eval(m.rawCtx, m.rawModel, c.rawAST, 1, &result) == 0 {
+	m.ctx.Lock()
+	defer m.ctx.Unlock()
+	if C._Z3_model_eval(m.ctx.Raw, m.rawModel, c.rawAST, 1, &result) == 0 {
 		return nil
 	}
 
 	return &AST{
-		rawCtx: m.rawCtx,
+		ctx:    m.ctx,
 		rawAST: result,
 	}
 }
@@ -66,12 +70,14 @@ func (m *Model) Assignments() map[string]*AST {
 		name := decl.DeclName()
 
 		// Get the assignment for this
+		m.ctx.Lock()
 		ast := C.Z3_model_get_const_interp(
-			m.rawCtx, m.rawModel, C.Z3_to_func_decl(decl.rawCtx, decl.rawAST))
+			m.ctx.Raw, m.rawModel, C.Z3_to_func_decl(decl.ctx.Raw, decl.rawAST))
+		m.ctx.Unlock()
 
 		// Map it
 		result[name.String()] = &AST{
-			rawCtx: m.rawCtx,
+			ctx:    m.ctx,
 			rawAST: ast,
 		}
 	}
@@ -83,7 +89,9 @@ func (m *Model) Assignments() map[string]*AST {
 //
 // Maps: Z3_model_get_num_consts
 func (m *Model) NumConsts() uint {
-	return uint(C.Z3_model_get_num_consts(m.rawCtx, m.rawModel))
+	m.ctx.Lock()
+	defer m.ctx.Unlock()
+	return uint(C.Z3_model_get_num_consts(m.ctx.Raw, m.rawModel))
 }
 
 // ConstDecl returns the const declaration for the given index. idx must
@@ -91,11 +99,13 @@ func (m *Model) NumConsts() uint {
 //
 // Maps: Z3_model_get_const_decl
 func (m *Model) ConstDecl(idx uint) *AST {
+	m.ctx.Lock()
+	defer m.ctx.Unlock()
 	return &AST{
-		rawCtx: m.rawCtx,
+		ctx: m.ctx,
 		rawAST: C.Z3_func_decl_to_ast(
-			m.rawCtx,
-			C.Z3_model_get_const_decl(m.rawCtx, m.rawModel, C.uint(idx))),
+			m.ctx.Raw,
+			C.Z3_model_get_const_decl(m.ctx.Raw, m.rawModel, C.uint(idx))),
 	}
 }
 
@@ -107,14 +117,18 @@ func (m *Model) ConstDecl(idx uint) *AST {
 // has manually increased the reference count, this will free the memory
 // associated with it.
 func (m *Model) Close() error {
-	C.Z3_model_dec_ref(m.rawCtx, m.rawModel)
+	m.ctx.Lock()
+	C.Z3_model_dec_ref(m.ctx.Raw, m.rawModel)
+	m.ctx.Unlock()
 	return nil
 }
 
 // IncRef increases the reference count of this model. This is advanced,
 // you probably don't need to use this.
 func (m *Model) IncRef() {
-	C.Z3_model_inc_ref(m.rawCtx, m.rawModel)
+	m.ctx.Lock()
+	C.Z3_model_inc_ref(m.ctx.Raw, m.rawModel)
+	m.ctx.Unlock()
 }
 
 // DecRef decreases the reference count of this model. This is advanced,
@@ -123,5 +137,7 @@ func (m *Model) IncRef() {
 // Close will decrease it automatically from the initial 1, so this should
 // only be called with exact matching calls to IncRef.
 func (m *Model) DecRef() {
-	C.Z3_model_dec_ref(m.rawCtx, m.rawModel)
+	m.ctx.Lock()
+	C.Z3_model_dec_ref(m.ctx.Raw, m.rawModel)
+	m.ctx.Unlock()
 }

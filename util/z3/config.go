@@ -56,10 +56,3 @@ func (c *Config) SetParamValue(k, v string) {
 
 	C.Z3_set_param_value(c.raw, ck, cv)
 }
-
-// Z3Value returns the raw internal pointer value. This should only be
-// used if you really understand what you're doing. It may be invalid after
-// Close is called.
-func (c *Config) Z3Value() C.Z3_config {
-	return c.raw
-}
