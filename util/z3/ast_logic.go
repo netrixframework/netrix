@@ -17,10 +17,12 @@ func (a *AST) Distinct(args ...*AST) *AST {
 		raws[i+1] = arg.rawAST
 	}
 
+	a.ctx.Lock()
+	defer a.ctx.Unlock()
 	return &AST{
-		rawCtx: a.rawCtx,
+		ctx: a.ctx,
 		rawAST: C.Z3_mk_distinct(
-			a.rawCtx,
+			a.ctx.Raw,
 			C.uint(len(raws)),
 			(*C.Z3_ast)(unsafe.Pointer(&raws[0]))),
 	}
@@ -30,9 +32,11 @@ func (a *AST) Distinct(args ...*AST) *AST {
 //
 // Maps to: Z3_mk_not
 func (a *AST) Not() *AST {
+	a.ctx.Lock()
+	defer a.ctx.Unlock()
 	return &AST{
-		rawCtx: a.rawCtx,
-		rawAST: C.Z3_mk_not(a.rawCtx, a.rawAST),
+		ctx:    a.ctx,
+		rawAST: C.Z3_mk_not(a.ctx.Raw, a.rawAST),
 	}
 }
 
@@ -40,9 +44,11 @@ func (a *AST) Not() *AST {
 //
 // Maps to: Z3_mk_eq
 func (a *AST) Eq(a2 *AST) *AST {
+	a.ctx.Lock()
+	defer a.ctx.Unlock()
 	return &AST{
-		rawCtx: a.rawCtx,
-		rawAST: C.Z3_mk_eq(a.rawCtx, a.rawAST, a2.rawAST),
+		ctx:    a.ctx,
+		rawAST: C.Z3_mk_eq(a.ctx.Raw, a.rawAST, a2.rawAST),
 	}
 }
 
@@ -50,9 +56,11 @@ func (a *AST) Eq(a2 *AST) *AST {
 //
 // a and a2 must be part of the same Context and be boolean types.
 func (a *AST) Ite(a2, a3 *AST) *AST {
+	a.ctx.Lock()
+	defer a.ctx.Unlock()
 	return &AST{
-		rawCtx: a.rawCtx,
-		rawAST: C.Z3_mk_ite(a.rawCtx, a.rawAST, a2.rawAST, a3.rawAST),
+		ctx:    a.ctx,
+		rawAST: C.Z3_mk_ite(a.ctx.Raw, a.rawAST, a2.rawAST, a3.rawAST),
 	}
 }
 
@@ -60,9 +68,11 @@ func (a *AST) Ite(a2, a3 *AST) *AST {
 //
 // a and a2 must be part of the same Context and be boolean types.
 func (a *AST) Iff(a2 *AST) *AST {
+	a.ctx.Lock()
+	defer a.ctx.Unlock()
 	return &AST{
-		rawCtx: a.rawCtx,
-		rawAST: C.Z3_mk_iff(a.rawCtx, a.rawAST, a2.rawAST),
+		ctx:    a.ctx,
+		rawAST: C.Z3_mk_iff(a.ctx.Raw, a.rawAST, a2.rawAST),
 	}
 }
 
@@ -70,9 +80,11 @@ func (a *AST) Iff(a2 *AST) *AST {
 //
 // a and a2 must be part of the same Context and be boolean types.
 func (a *AST) Implies(a2 *AST) *AST {
+	a.ctx.Lock()
+	defer a.ctx.Unlock()
 	return &AST{
-		rawCtx: a.rawCtx,
-		rawAST: C.Z3_mk_implies(a.rawCtx, a.rawAST, a2.rawAST),
+		ctx:    a.ctx,
+		rawAST: C.Z3_mk_implies(a.ctx.Raw, a.rawAST, a2.rawAST),
 	}
 }
 
@@ -80,9 +92,11 @@ func (a *AST) Implies(a2 *AST) *AST {
 //
 // a and a2 must be part of the same Context and be boolean types.
 func (a *AST) Xor(a2 *AST) *AST {
+	a.ctx.Lock()
+	defer a.ctx.Unlock()
 	return &AST{
-		rawCtx: a.rawCtx,
-		rawAST: C.Z3_mk_xor(a.rawCtx, a.rawAST, a2.rawAST),
+		ctx:    a.ctx,
+		rawAST: C.Z3_mk_xor(a.ctx.Raw, a.rawAST, a2.rawAST),
 	}
 }
 
@@ -96,10 +110,12 @@ func (a *AST) And(args ...*AST) *AST {
 		raws[i+1] = arg.rawAST
 	}
 
+	a.ctx.Lock()
+	defer a.ctx.Unlock()
 	return &AST{
-		rawCtx: a.rawCtx,
+		ctx: a.ctx,
 		rawAST: C.Z3_mk_and(
-			a.rawCtx,
+			a.ctx.Raw,
 			C.uint(len(raws)),
 			(*C.Z3_ast)(unsafe.Pointer(&raws[0]))),
 	}
@@ -115,10 +131,12 @@ func (a *AST) Or(args ...*AST) *AST {
 		raws[i+1] = arg.rawAST
 	}
 
+	a.ctx.Lock()
+	defer a.ctx.Unlock()
 	return &AST{
-		rawCtx: a.rawCtx,
+		ctx: a.ctx,
 		rawAST: C.Z3_mk_or(
-			a.rawCtx,
+			a.ctx.Raw,
 			C.uint(len(raws)),
 			(*C.Z3_ast)(unsafe.Pointer(&raws[0]))),
 	}

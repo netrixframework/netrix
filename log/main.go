@@ -41,7 +41,7 @@ func NewLogger(c config.LogConfig) *Logger {
 	}
 }
 
-// Debug logs a debug messagewith the default logger
+// Debug logs a debug message with the default logger
 func Debug(s string) {
 	DefaultLogger.Debug(s)
 }

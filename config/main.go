@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"time"
 )
 
 var (
@@ -22,18 +21,8 @@ type Config struct {
 	APIServerAddr string `json:"server_addr"`
 	// LogConfig configuration for logging
 	LogConfig LogConfig `json:"log"`
-	// Strategy config
-	StrategyConfig StrategyConfig `json:"strategy"`
 	// The raw json of the config
 	Raw map[string]interface{} `json:"-"`
-}
-
-// StrategyConfig store the config used for running strategies
-type StrategyConfig struct {
-	// Iterations the number of iterations to be run
-	Iterations int `json:"iterations"`
-	// IterationTimeout timeout for each iteration
-	IterationTimeout time.Duration `json:"iteration_timeout"`
 }
 
 // LogConfig stores the config for logging purpose
@@ -46,7 +35,7 @@ type LogConfig struct {
 	Level string `json:"level"`
 }
 
-// PatseConfig parses config from the specificied file
+// ParseConfig parses config from the specified file
 func ParseConfig(path string) (*Config, error) {
 	bytes, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -64,7 +53,7 @@ func ParseConfig(path string) (*Config, error) {
 	}
 	err = json.Unmarshal(bytes, &defaultConfig)
 	if err != nil {
-		return nil, fmt.Errorf("error unmarshalling config: %s", err)
+		return nil, fmt.Errorf("error parsing config: %s", err)
 	}
 	json.Unmarshal(bytes, &defaultConfig.Raw)
 	return defaultConfig, nil

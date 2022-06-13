@@ -180,6 +180,23 @@ func NewEventDag(replicaStore *ReplicaStore) *EventDAG {
 	return d
 }
 
+func (d *EventDAG) Reset() {
+	d.lock.Lock()
+	d.nodes = make(map[EventID]*EventNode)
+	d.strands = make(map[ReplicaID]EventID)
+	d.latest = make(map[ReplicaID]EventID)
+	d.sends = make(map[MessageID]*EventNode)
+	d.timeoutStarts = make(map[string]*EventNode)
+
+	d.lock.Unlock()
+	d.clockLock.Lock()
+	d.latestClocks = make(map[ReplicaID]ClockValue)
+	for _, r := range d.replicaStore.Iter() {
+		d.latestClocks[r.ID] = ZeroClock(d.replicaStore.Cap())
+	}
+	d.clockLock.Unlock()
+}
+
 func (d *EventDAG) nextClock(e *EventNode, parents []*EventNode) ClockValue {
 	next := make([]float64, d.replicaStore.Cap())
 	d.clockLock.Lock()

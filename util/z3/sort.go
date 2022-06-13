@@ -31,35 +31,43 @@ var (
 
 // Sort represents a sort in Z3.
 type Sort struct {
-	rawCtx  C.Z3_context
+	ctx     *Context
 	rawSort C.Z3_sort
 }
 
 // BoolSort returns the boolean type.
 func (c *Context) BoolSort() *Sort {
+	c.Mutex.Lock()
+	defer c.Mutex.Unlock()
 	return &Sort{
-		rawCtx:  c.raw,
-		rawSort: C.Z3_mk_bool_sort(c.raw),
+		ctx:     c,
+		rawSort: C.Z3_mk_bool_sort(c.Raw),
 	}
 }
 
 // IntSort returns the int type.
 func (c *Context) IntSort() *Sort {
+	c.Mutex.Lock()
+	defer c.Mutex.Unlock()
 	return &Sort{
-		rawCtx:  c.raw,
-		rawSort: C.Z3_mk_int_sort(c.raw),
+		ctx:     c,
+		rawSort: C.Z3_mk_int_sort(c.Raw),
 	}
 }
 
 func (c *Context) RealSort() *Sort {
+	c.Mutex.Lock()
+	defer c.Mutex.Unlock()
 	return &Sort{
-		rawCtx:  c.raw,
-		rawSort: C.Z3_mk_real_sort(c.raw),
+		ctx:     c,
+		rawSort: C.Z3_mk_real_sort(c.Raw),
 	}
 }
 
 func (s *Sort) Kind() *SortKind {
+	s.ctx.Lock()
+	defer s.ctx.Unlock()
 	return &SortKind{
-		rawSortKind: C.Z3_get_sort_kind(s.rawCtx, s.rawSort),
+		rawSortKind: C.Z3_get_sort_kind(s.ctx.Raw, s.rawSort),
 	}
 }

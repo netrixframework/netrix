@@ -17,10 +17,12 @@ func (a *AST) Add(args ...*AST) *AST {
 		raws[i+1] = arg.rawAST
 	}
 
+	a.ctx.Lock()
+	defer a.ctx.Unlock()
 	return &AST{
-		rawCtx: a.rawCtx,
+		ctx: a.ctx,
 		rawAST: C.Z3_mk_add(
-			a.rawCtx,
+			a.ctx.Raw,
 			C.uint(len(raws)),
 			(*C.Z3_ast)(unsafe.Pointer(&raws[0]))),
 	}
@@ -36,20 +38,24 @@ func (a *AST) Mul(args ...*AST) *AST {
 		raws[i+1] = arg.rawAST
 	}
 
+	a.ctx.Lock()
+	defer a.ctx.Unlock()
 	return &AST{
-		rawCtx: a.rawCtx,
+		ctx: a.ctx,
 		rawAST: C.Z3_mk_mul(
-			a.rawCtx,
+			a.ctx.Raw,
 			C.uint(len(raws)),
 			(*C.Z3_ast)(unsafe.Pointer(&raws[0]))),
 	}
 }
 
 func (a *AST) Div(other *AST) *AST {
+	a.ctx.Lock()
+	defer a.ctx.Unlock()
 	return &AST{
-		rawCtx: a.rawCtx,
+		ctx: a.ctx,
 		rawAST: C.Z3_mk_div(
-			a.rawCtx,
+			a.ctx.Raw,
 			a.rawAST,
 			other.rawAST,
 		),
@@ -59,17 +65,17 @@ func (a *AST) Div(other *AST) *AST {
 // Sub creates an AST node representing subtraction.
 //
 // All AST values must be part of the same context.
-func (a *AST) Sub(args ...*AST) *AST {
-	raws := make([]C.Z3_ast, len(args)+1)
+func (a *AST) Sub(other *AST) *AST {
+	raws := make([]C.Z3_ast, 2)
 	raws[0] = a.rawAST
-	for i, arg := range args {
-		raws[i+1] = arg.rawAST
-	}
+	raws[1] = other.rawAST
 
+	a.ctx.Lock()
+	defer a.ctx.Unlock()
 	return &AST{
-		rawCtx: a.rawCtx,
+		ctx: a.ctx,
 		rawAST: C.Z3_mk_sub(
-			a.rawCtx,
+			a.ctx.Raw,
 			C.uint(len(raws)),
 			(*C.Z3_ast)(unsafe.Pointer(&raws[0]))),
 	}
@@ -79,9 +85,11 @@ func (a *AST) Sub(args ...*AST) *AST {
 //
 // Maps to: Z3_mk_lt
 func (a *AST) Lt(a2 *AST) *AST {
+	a.ctx.Lock()
+	defer a.ctx.Unlock()
 	return &AST{
-		rawCtx: a.rawCtx,
-		rawAST: C.Z3_mk_lt(a.rawCtx, a.rawAST, a2.rawAST),
+		ctx:    a.ctx,
+		rawAST: C.Z3_mk_lt(a.ctx.Raw, a.rawAST, a2.rawAST),
 	}
 }
 
@@ -89,9 +97,11 @@ func (a *AST) Lt(a2 *AST) *AST {
 //
 // Maps to: Z3_mk_le
 func (a *AST) Le(a2 *AST) *AST {
+	a.ctx.Lock()
+	defer a.ctx.Unlock()
 	return &AST{
-		rawCtx: a.rawCtx,
-		rawAST: C.Z3_mk_le(a.rawCtx, a.rawAST, a2.rawAST),
+		ctx:    a.ctx,
+		rawAST: C.Z3_mk_le(a.ctx.Raw, a.rawAST, a2.rawAST),
 	}
 }
 
@@ -99,9 +109,11 @@ func (a *AST) Le(a2 *AST) *AST {
 //
 // Maps to: Z3_mk_gt
 func (a *AST) Gt(a2 *AST) *AST {
+	a.ctx.Lock()
+	defer a.ctx.Unlock()
 	return &AST{
-		rawCtx: a.rawCtx,
-		rawAST: C.Z3_mk_gt(a.rawCtx, a.rawAST, a2.rawAST),
+		ctx:    a.ctx,
+		rawAST: C.Z3_mk_gt(a.ctx.Raw, a.rawAST, a2.rawAST),
 	}
 }
 
@@ -109,8 +121,10 @@ func (a *AST) Gt(a2 *AST) *AST {
 //
 // Maps to: Z3_mk_ge
 func (a *AST) Ge(a2 *AST) *AST {
+	a.ctx.Lock()
+	defer a.ctx.Unlock()
 	return &AST{
-		rawCtx: a.rawCtx,
-		rawAST: C.Z3_mk_ge(a.rawCtx, a.rawAST, a2.rawAST),
+		ctx:    a.ctx,
+		rawAST: C.Z3_mk_ge(a.ctx.Raw, a.rawAST, a2.rawAST),
 	}
 }
