@@ -39,6 +39,10 @@ func (f *FilteredStrategy) Step(e *types.Event, c *Context) Action {
 	return DoNothing()
 }
 
+func (f *FilteredStrategy) EndCurIteration(*Context) {
+
+}
+
 func (f *FilteredStrategy) NextIteration(*Context) {
 
 }

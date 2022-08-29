@@ -90,6 +90,7 @@ func ActionSequence(actions ...Action) Action {
 type Strategy interface {
 	types.Service
 	Step(*types.Event, *Context) Action
+	EndCurIteration(*Context)
 	NextIteration(*Context)
 	Finalize(*Context)
 }

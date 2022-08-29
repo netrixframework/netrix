@@ -2,10 +2,13 @@ package timeout
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/netrixframework/netrix/strategies"
 	"github.com/netrixframework/netrix/types"
 	"github.com/netrixframework/netrix/util/z3"
+	"golang.org/x/exp/rand"
+	"gonum.org/v1/gonum/stat/distuv"
 )
 
 type pendingEvent struct {
@@ -14,6 +17,25 @@ type pendingEvent struct {
 	constraints []*z3.AST
 	timeout     *types.ReplicaTimeout
 	message     *types.Message
+	delay       int
+	dist        *distuv.Bernoulli
+}
+
+func (p *pendingEvent) assignDist() {
+	var prob float64
+	if p.delay < 10 {
+		prob = 1.0
+	} else {
+		prob = 10.0 / float64(p.delay)
+	}
+	p.dist = &distuv.Bernoulli{
+		P:   prob,
+		Src: rand.NewSource(uint64(time.Now().UnixNano())),
+	}
+}
+
+func (p *pendingEvent) fire() bool {
+	return p.dist.Rand() == 1
 }
 
 func (t *TimeoutStrategy) updatePendingEvents(e *types.Event, ctx *strategies.Context) {
@@ -30,6 +52,7 @@ func (t *TimeoutStrategy) updatePendingEvents(e *types.Event, ctx *strategies.Co
 			replica:     message.To,
 			constraints: make([]*z3.AST, 0),
 			message:     message,
+			delay:       0,
 		}
 		sendSymbol, ok := t.symbolMap.Get(fmt.Sprintf("e_%d", e.ID))
 		if !ok {
@@ -54,6 +77,8 @@ func (t *TimeoutStrategy) updatePendingEvents(e *types.Event, ctx *strategies.Co
 				receiveSymbol.Sub(sendSymbol.Mul(t.config.driftMax(t.z3context))).Le(t.z3context.Int(delayVal)),
 			)
 		}
+		pEvent.delay = delayVal
+		pEvent.assignDist()
 	} else if e.IsTimeoutStart() {
 		timeout, _ := e.Timeout()
 		pEvent = &pendingEvent{
@@ -73,6 +98,8 @@ func (t *TimeoutStrategy) updatePendingEvents(e *types.Event, ctx *strategies.Co
 			pEvent.constraints,
 			endSymbol.Eq(startSymbol.Add(t.z3context.Int(int(timeout.Duration.Milliseconds())))),
 		)
+		pEvent.delay = int(timeout.Duration.Milliseconds())
+		pEvent.assignDist()
 	}
 	if pEvent != nil {
 		t.pendingEvents.Add(pEvent.label, pEvent)

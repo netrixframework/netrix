@@ -173,13 +173,13 @@ func (d *Driver) main() error {
 		d.newIteration = true
 		d.lock.Unlock()
 
-		d.strategyCtx.NextIteration()
-		if d.strategyCtx.CurIteration() != d.config.Iterations {
-			d.strategy.NextIteration(d.strategyCtx)
-			d.ctx.Reset()
+		d.strategy.EndCurIteration(d.strategyCtx)
 
-			d.dispatcher.RestartAll()
-		}
+		d.strategyCtx.NextIteration()
+		d.strategy.NextIteration(d.strategyCtx)
+		d.ctx.Reset()
+
+		d.dispatcher.RestartAll()
 		d.ctx.EventIDGen.Reset()
 	}
 	d.strategy.Finalize(d.strategyCtx)

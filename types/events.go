@@ -88,6 +88,14 @@ func (e *Event) IsTimeoutEnd() bool {
 	return false
 }
 
+func (e *Event) IsGeneric() bool {
+	switch e.Type.(type) {
+	case *GenericEventType:
+		return true
+	}
+	return false
+}
+
 // Clone implements Clonable
 func (e *Event) Clone() Clonable {
 	return &Event{

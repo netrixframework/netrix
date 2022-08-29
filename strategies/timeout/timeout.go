@@ -3,7 +3,6 @@ package timeout
 import (
 	"errors"
 	"fmt"
-	"math"
 	"strconv"
 	"time"
 
@@ -13,8 +12,6 @@ import (
 	"github.com/netrixframework/netrix/types"
 	"github.com/netrixframework/netrix/util"
 	"github.com/netrixframework/netrix/util/z3"
-	"golang.org/x/exp/rand"
-	"gonum.org/v1/gonum/stat/distuv"
 )
 
 var (
@@ -43,8 +40,6 @@ type TimeoutStrategyConfig struct {
 	RecordFilePath string
 	// PendingEventThreshold dictates the minimum number of pending events required to choose one
 	PendingEventThreshold int
-	// MessageBias probability bias towards messages vs timeouts (between 0 and 1 where 1 is more messages vs timeouts)
-	MessageBias float64
 }
 
 func (c *TimeoutStrategyConfig) UseDistribution() bool {
@@ -61,16 +56,14 @@ func (c *TimeoutStrategyConfig) validate() error {
 	if c.PendingEventThreshold == 0 {
 		c.PendingEventThreshold = 1
 	}
-	if c.MessageBias == 0 {
-		c.MessageBias = 0.5
-	}
 	return nil
 }
 
 func (c *TimeoutStrategyConfig) DelayValue() int {
 	if c.DelayDistribution != nil && c.Nondeterministic {
-		max := math.Min(float64(c.MaxMessageDelay.Milliseconds()), float64(c.DelayDistribution.Rand()))
-		return int(max)
+		// max := math.Min(float64(c.MaxMessageDelay.Milliseconds()), float64(c.DelayDistribution.Rand()))
+		// return int(max)
+		return c.DelayDistribution.Rand()
 	}
 	return int(c.MaxMessageDelay.Milliseconds())
 }
@@ -105,11 +98,10 @@ type TimeoutStrategy struct {
 	config          *TimeoutStrategyConfig
 	normalTimer     *timer
 	records         *records
-	dist            *distuv.Bernoulli
 
 	z3config  *z3.Config
 	z3context *z3.Context
-	z3solver  *z3.Solver
+	z3solver  *z3.Optimizer
 	*types.BaseService
 }
 
@@ -135,14 +127,10 @@ func NewTimeoutStrategy(config *TimeoutStrategyConfig) (*TimeoutStrategy, error)
 		pendingEventCtr: util.NewCounter(),
 		config:          config,
 		records:         newRecords(config.RecordFilePath),
-		dist: &distuv.Bernoulli{
-			P:   config.MessageBias,
-			Src: rand.NewSource(uint64(time.Now().UnixNano())),
-		},
-		z3config:    z3config,
-		z3context:   z3context,
-		z3solver:    z3context.NewSolver(),
-		BaseService: types.NewBaseService("TimeoutStrategy", nil),
+		z3config:        z3config,
+		z3context:       z3context,
+		z3solver:        z3context.NewOptimizer(),
+		BaseService:     types.NewBaseService("TimeoutStrategy", nil),
 	}
 	if !config.Nondeterministic {
 		strategy.normalTimer = newTimer()
@@ -226,6 +214,8 @@ func (t *TimeoutStrategy) updateConstraints(e *types.Event, ctx *strategies.Cont
 	t.symbolMap.Add(key, eSymbol)
 	constraints := []*z3.AST{eSymbol.Ge(t.z3context.Int(0))}
 
+	isInternalEvent := e.IsMessageSend() || e.IsGeneric()
+
 	for _, pID := range eNode.Parents.Iter() {
 		pNode, ok := ctx.EventDAG.GetNode(pID)
 		if !ok {
@@ -237,6 +227,15 @@ func (t *TimeoutStrategy) updateConstraints(e *types.Event, ctx *strategies.Cont
 		if !ok {
 			continue
 		}
+
+		if isInternalEvent {
+			constraints = append(
+				constraints,
+				pSymbol.Eq(eSymbol),
+			)
+			continue
+		}
+
 		isParentReceive := false
 		var messageID string
 		isParentTimeoutStart := false
@@ -294,16 +293,56 @@ func (t *TimeoutStrategy) updateConstraints(e *types.Event, ctx *strategies.Cont
 		}).Debug("Adding constraint")
 		t.z3solver.Assert(c)
 
-		// result := t.z3solver.Check()
-		// if result != z3.True {
-		// 	panic("constraint not solvable")
-		// }
+		result := t.z3solver.Check()
+		if result != z3.True {
+			panic("constraint not solvable")
+		}
 	}
 	return true
 }
 
 func (t *TimeoutStrategy) Finalize(c *strategies.Context) {
 	t.records.summarize(c)
+}
+
+func (t *TimeoutStrategy) EndCurIteration(ctx *strategies.Context) {
+	if t.z3solver != nil {
+		spurious := false
+		var expr *z3.AST = nil
+		opts := make(map[string]*z3.OptimizedValue)
+		for _, r := range ctx.Replicas.Iter() {
+			e, ok := ctx.EventDAG.GetLatestNode(r.ID)
+			if ok {
+				symb, ok := t.symbolMap.Get(fmt.Sprintf("e_%d", e.ID))
+				if ok {
+					if expr == nil {
+						expr = symb
+					} else {
+						expr = expr.Add(symb)
+					}
+					opts[string(r.ID)] = t.z3solver.Minimize(symb)
+				}
+			}
+		}
+		if expr != nil {
+			t.z3solver.Minimize(expr)
+		}
+		ctx.Logger.With(log.LogParams{"iteration": ctx.CurIteration()}).Debug("checking spuriousness")
+		spurious = t.z3solver.Check() != z3.True
+		ctx.Logger.With(log.LogParams{"iteration": ctx.CurIteration(), "spurious": spurious}).Debug("done checking spuriousness")
+		if !spurious {
+			params := log.LogParams{}
+			for r, o := range opts {
+				ctx.Logger.With(log.LogParams{"replica": r}).Debug("Fetching optimal value")
+				val, ok := o.Value()
+				if ok {
+					params[r] = val
+				}
+			}
+			ctx.Logger.With(params).Info("Optimized values")
+		}
+		t.records.newIteration(spurious, ctx.CurIteration()+1)
+	}
 }
 
 func (t *TimeoutStrategy) NextIteration(ctx *strategies.Context) {
@@ -318,14 +357,6 @@ func (t *TimeoutStrategy) NextIteration(ctx *strategies.Context) {
 	t.delayVals.RemoveAll()
 
 	if t.z3solver != nil {
-		spurious := false
-		ctx.Logger.With(log.LogParams{"iteration": ctx.CurIteration()}).Debug("checking spuriousness")
-		solvable := t.z3solver.Check()
-		if solvable != z3.True {
-			spurious = true
-		}
-		ctx.Logger.With(log.LogParams{"iteration": ctx.CurIteration()}).Debug("done checking spuriousness")
-		t.records.newIteration(spurious, ctx.CurIteration())
 		t.z3solver.Reset()
 	}
 

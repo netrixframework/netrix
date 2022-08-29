@@ -77,10 +77,6 @@ func (r *records) newIteration(spurious bool, i int) {
 		choices.Save(r.filePath)
 		delete(r.choices, i-1)
 	}
-	_, ok = r.r[i]
-	if !ok {
-		r.r[i] = newRecord()
-	}
 }
 
 func (r *records) step(c *strategies.Context) {
@@ -230,6 +226,7 @@ func (c *choices) Save(p string) {
 		choiceD := make(map[string]interface{})
 		choiceD["timeouts"] = choice.timeouts
 		choiceD["messages"] = choice.messages
+		choiceD["duration"] = choice.time.Nanoseconds()
 		if choice.choice == 1 {
 			choiceD["choice"] = "timeout"
 		} else {

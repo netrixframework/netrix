@@ -2,7 +2,7 @@ package z3
 
 import "testing"
 
-func TestOptmize(t *testing.T) {
+func TestOptimize(t *testing.T) {
 	config := NewConfig()
 	defer config.Close()
 
@@ -17,6 +17,7 @@ func TestOptmize(t *testing.T) {
 	opt.Assert(x.Add(y).Le(context.Int(10)))
 	opt.Assert(x.Add(y).Gt(context.Int(0)))
 
+	t.Log("checking assert")
 	if opt.Check() != True {
 		t.Fatalf("could not solve the constraints")
 	}
@@ -71,12 +72,14 @@ func TestOptimizeMimimize(t *testing.T) {
 
 	min := opt.Minimize(x.Add(y))
 
+	t.Log("checking assert")
 	if opt.Check() != True {
 		t.Fatalf("could not solve the constraints")
 	}
 	m := opt.Model()
 	defer m.Close()
 
+	t.Log("Fetching minimal value")
 	v, ok := min.Value()
 	if !ok || v != 1 {
 		t.Logf("\nModel:\n%s", m.String())

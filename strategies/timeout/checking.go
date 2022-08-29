@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/netrixframework/netrix/log"
 	"github.com/netrixframework/netrix/strategies"
 	"github.com/netrixframework/netrix/util/z3"
 )
@@ -44,11 +45,11 @@ func (t *TimeoutStrategy) findRandomPendingEvent(ctx *strategies.Context) (*pend
 	}
 	start := time.Now()
 	var randomEvent *pendingEvent = nil
-	shouldChooseMessage := t.dist.Rand() == 1
 	for _, e := range t.pendingEvents.IterValues() {
-		if shouldChooseMessage && e.message == nil {
-			continue
-		}
+		t.Logger.With(log.LogParams{
+			"event":   e.label,
+			"replica": e.replica,
+		}).Debug("Checking if event is minimal")
 		solver.Push()
 		eSymbol, ok := t.symbolMap.Get(e.label)
 		if !ok {
@@ -58,18 +59,22 @@ func (t *TimeoutStrategy) findRandomPendingEvent(ctx *strategies.Context) (*pend
 			if p.label != e.label {
 				pSymbol, ok := t.symbolMap.Get(p.label)
 				if ok {
-					solver.Assert(eSymbol.Lt(pSymbol))
+					solver.Assert(eSymbol.Le(pSymbol))
 				}
 			}
 		}
 		sOk := solver.Check()
-		solver.Pop(1)
-		if sOk == z3.True {
+		solver.Pop()
+		if sOk == z3.True && e.fire() {
+			t.Logger.With(log.LogParams{
+				"event":   e.label,
+				"replica": e.replica,
+			}).Debug("Found event")
 			randomEvent = e
 			break
 		}
 	}
-	solver.Pop(1)
+	solver.Pop()
 	duration := time.Since(start)
 	if randomEvent != nil {
 		ch := choice{

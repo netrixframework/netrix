@@ -90,10 +90,18 @@ func (s *Solver) Push() {
 	s.ctx.Unlock()
 }
 
-func (s *Solver) Pop(b uint) {
+func (s *Solver) Pop() {
 	s.ctx.Lock()
 	s.lock.Lock()
-	C.Z3_solver_pop(s.ctx.Raw, s.rawSolver, C.uint(b))
+	C.Z3_solver_pop(s.ctx.Raw, s.rawSolver, C.uint(1))
+	s.lock.Unlock()
+	s.ctx.Unlock()
+}
+
+func (s *Solver) PopN(n uint) {
+	s.ctx.Lock()
+	s.lock.Lock()
+	C.Z3_solver_pop(s.ctx.Raw, s.rawSolver, C.uint(n))
 	s.lock.Unlock()
 	s.ctx.Unlock()
 }

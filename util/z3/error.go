@@ -69,5 +69,5 @@ func goZ3ErrorHandler(raw C.Z3_context, code C.Z3_error_code) {
 	}
 
 	// Call it!
-	f(&Context{Raw: raw}, ErrorCode(code))
+	f(&Context{Raw: raw, Mutex: new(sync.Mutex)}, ErrorCode(code))
 }

@@ -44,6 +44,10 @@ func (d *DummyStrategy) Step(event *types.Event, c *Context) Action {
 	return DoNothing()
 }
 
+func (f *DummyStrategy) EndCurIteration(*Context) {
+
+}
+
 func (d *DummyStrategy) NextIteration(*Context) {
 
 }

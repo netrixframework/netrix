@@ -183,7 +183,7 @@ func (s *StateMachine) newState(label string) *State {
 	return newState
 }
 
-func (s *StateMachine) step(e *types.Event, c *Context) {
+func (s *StateMachine) Step(e *types.Event, c *Context) {
 	state := s.run.CurState()
 	for _, to := range state.transitionOrder {
 		cond := state.Transitions[to]
@@ -229,7 +229,7 @@ func NewStateMachineHandler(stateMachine *StateMachine) FilterFunc {
 			"event_id":   e.ID,
 			"event_type": e.TypeS,
 		}).Debug("Async state machine handler step")
-		stateMachine.step(e, c)
+		stateMachine.Step(e, c)
 		newState := stateMachine.CurState()
 		if newState.Is(FailStateLabel) {
 			c.Abort()

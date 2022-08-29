@@ -63,9 +63,10 @@ func (s *Map[T, V]) IterValues() []V {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	vals := make([]V, len(s.m))
+	indexes := rand.Perm(len(s.m))
 	i := 0
 	for _, v := range s.m {
-		vals[i] = v
+		vals[indexes[i]] = v
 		i++
 	}
 	return vals
@@ -210,4 +211,74 @@ func (q *Queue[V]) Subscribe(label string) chan V {
 	newChan := make(chan V, 10)
 	q.subscribers[label] = newChan
 	return newChan
+}
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
+type List[V any] struct {
+	elems []V
+	size  int
+	lock  *sync.Mutex
+}
+
+func NewEmptyList[V any]() *List[V] {
+	return &List[V]{
+		elems: make([]V, 0),
+		size:  0,
+		lock:  new(sync.Mutex),
+	}
+}
+
+func NewList[V any](cur []V) *List[V] {
+	elements := make([]V, len(cur))
+	copy(elements, cur)
+	return &List[V]{
+		elems: elements,
+		size:  len(cur),
+		lock:  new(sync.Mutex),
+	}
+}
+
+func (l *List[V]) Append(e V) {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	l.elems = append(l.elems, e)
+	l.size += 1
+}
+
+func (l *List[V]) Elem(index int) (V, bool) {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	var res V
+	if index < 0 || index > l.size {
+		return res, false
+	}
+	return l.elems[index], true
+}
+
+func (l *List[V]) Size() int {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	return l.size
+}
+
+func (l *List[V]) Iter() []V {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	res := make([]V, l.size)
+	copy(res, l.elems)
+	return res
+}
+
+func (l *List[V]) RemoveAll() []V {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	result := make([]V, l.size)
+	copy(result, l.elems)
+	l.elems = make([]V, 0)
+	l.size = 0
+	return result
 }
