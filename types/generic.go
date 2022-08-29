@@ -106,6 +106,28 @@ func (s *Map[T, V]) RandomValueWithSource(src rand.Source) (V, bool) {
 	return s.Get(rID)
 }
 
+type Set[T constraints.Ordered] struct {
+	m *Map[T, T]
+}
+
+func NewSet[T constraints.Ordered]() *Set[T] {
+	return &Set[T]{
+		m: NewMap[T, T](),
+	}
+}
+
+func (s *Set[T]) Add(elem T) {
+	s.m.Add(elem, elem)
+}
+
+func (s *Set[T]) Remove(elem T) {
+	s.m.Remove(elem)
+}
+
+func (s *Set[T]) Contains(elem T) bool {
+	return s.m.Exists(elem)
+}
+
 // Clonable is any type which returns a copy of itself on Clone()
 type Clonable interface {
 	Clone() Clonable
