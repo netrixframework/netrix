@@ -4,15 +4,33 @@ import "github.com/netrixframework/netrix/types"
 
 type Event struct {
 	messageID types.MessageID
-	replica   types.ReplicaID
+	from      types.ReplicaID
+	to        types.ReplicaID
+	label     int
+}
+
+func (e *Event) Lt(other *Event) bool {
+	// use vector clocks for determining partial orders
+	// Delegate this to the protocol.
+	return false
+}
+
+func (e *Event) HasLabel() bool {
+	return e.label != -1
+}
+
+func (e *Event) Label() int {
+	return e.label
 }
 
 func NewEvent(message *types.Message) *Event {
 	return &Event{
 		messageID: message.ID,
-		replica:   message.To,
+		to:        message.To,
+		from:      message.From,
+		label:     -1,
 	}
 }
 
-type EventPartialOrder struct {
+type EventOrder struct {
 }

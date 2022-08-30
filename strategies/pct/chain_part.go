@@ -7,6 +7,7 @@ import (
 )
 
 type Chain struct {
+	ID     int
 	events []*Event
 	lock   *sync.Mutex
 
@@ -15,7 +16,7 @@ type Chain struct {
 	size              int
 }
 
-func NewChain(event *Event) *Chain {
+func NewChain(id int, event *Event) *Chain {
 	chain := &Chain{
 		events:            make([]*Event, 0),
 		lock:              new(sync.Mutex),
@@ -25,6 +26,57 @@ func NewChain(event *Event) *Chain {
 	}
 	chain.events = append(chain.events, event)
 	return chain
+}
+
+func (c *Chain) CanAddEvent(e *Event) bool {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	last := c.events[c.size-1]
+	return last.Lt(e)
+}
+
+func (c *Chain) AddEvent(e *Event) {
+	if !c.CanAddEvent(e) {
+		return
+	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.events = append(c.events, e)
+	c.size = c.size + 1
+	if !c.enabled {
+		c.enabled = true
+		c.enabledEventIndex = c.size - 1
+	}
+}
+
+func (c *Chain) IsEnabled() bool {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	return c.enabled
+}
+
+func (c *Chain) EnabledEvent() (*Event, bool) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if !c.enabled {
+		return nil, false
+	}
+	return c.events[c.enabledEventIndex], true
+}
+
+func (c *Chain) IncrEnabledEvent() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if c.enabledEventIndex+1 == c.size {
+		c.enabled = false
+		c.enabledEventIndex = c.enabledEventIndex + 1
+	} else {
+		c.enabledEventIndex = c.enabledEventIndex + 1
+	}
 }
 
 type ChainPartition struct {
@@ -39,4 +91,94 @@ func NewChainPartition() *ChainPartition {
 		Partitions: make([]*types.Set[int], 0),
 		lock:       new(sync.Mutex),
 	}
+}
+
+// AddEvent adds the event to the chain partition
+// Returns the chain ID and a boolean indicating if the chain is newly created
+func (p *ChainPartition) AddEvent(e *Event) (int, bool) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	newChainCreated := false
+	addedChainID := -1
+	addedPartition := -1
+
+	for i, partition := range p.Partitions {
+		var compatibleChain *Chain = nil
+		for _, chainID := range partition.Iter() {
+			chain, _ := p.Chains.Get(chainID)
+			if chain.CanAddEvent(e) {
+				compatibleChain = chain
+				break
+			}
+		}
+
+		if compatibleChain != nil {
+			compatibleChain.AddEvent(e)
+			addedChainID = compatibleChain.ID
+
+			addedPartition = i
+			break
+		} else if partition.Size() < i+1 {
+			newChain := NewChain(p.Chains.Size(), e)
+			partition.Add(newChain.ID)
+			addedChainID = newChain.ID
+			newChainCreated = true
+
+			addedPartition = i
+			break
+		}
+	}
+
+	if addedChainID == -1 {
+		newPartition := types.NewSet[int]()
+		p.Partitions = append(p.Partitions, newPartition)
+
+		newChain := NewChain(p.Chains.Size(), e)
+		newPartition.Add(newChain.ID)
+
+		addedPartition = len(p.Partitions) - 1
+		addedChainID = newChain.ID
+		newChainCreated = true
+	}
+
+	if addedPartition > 0 {
+		curPartition := p.Partitions[addedPartition]
+		curPartition.Remove(addedChainID)
+
+		precedingPartition := p.Partitions[addedPartition-1]
+		precedingPartition.Add(addedChainID)
+
+		p.Partitions[addedPartition-1], p.Partitions[addedPartition] = curPartition, precedingPartition
+	}
+
+	return addedChainID, newChainCreated
+}
+
+func (p *ChainPartition) EnabledChains() []int {
+	result := make([]int, 0)
+	for chainID, chain := range p.Chains.ToMap() {
+		if chain.IsEnabled() {
+			result = append(result, chainID)
+		}
+	}
+
+	return result
+}
+
+func (p *ChainPartition) GetEnabledEvent(chainID int) (*Event, bool) {
+	chain, ok := p.Chains.Get(chainID)
+	if !ok {
+		return nil, false
+	}
+
+	return chain.EnabledEvent()
+}
+
+func (p *ChainPartition) Reset() {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	p.Chains.RemoveAll()
+	p.Partitions = make([]*types.Set[int], 0)
 }

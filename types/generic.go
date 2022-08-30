@@ -72,6 +72,20 @@ func (s *Map[T, V]) IterValues() []V {
 	return vals
 }
 
+func (s *Map[T, V]) Keys() []T {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	keys := make([]T, len(s.m))
+	indexes := rand.Perm(len(s.m))
+	i := 0
+	for k := range s.m {
+		keys[indexes[i]] = k
+		i++
+	}
+	return keys
+}
+
 func (s *Map[T, V]) ToMap() map[T]V {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -126,6 +140,14 @@ func (s *Set[T]) Remove(elem T) {
 
 func (s *Set[T]) Contains(elem T) bool {
 	return s.m.Exists(elem)
+}
+
+func (s *Set[T]) Iter() []T {
+	return s.m.Keys()
+}
+
+func (s *Set[T]) Size() int {
+	return s.m.Size()
 }
 
 // Clonable is any type which returns a copy of itself on Clone()
