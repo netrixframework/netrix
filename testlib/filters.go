@@ -1,6 +1,9 @@
 package testlib
 
-import "github.com/netrixframework/netrix/types"
+import (
+	"github.com/netrixframework/netrix/sm"
+	"github.com/netrixframework/netrix/types"
+)
 
 // FilterFunc type to define a conditional handler
 // returns false in the second return value if the handler is not concerned about the event
@@ -28,7 +31,7 @@ func WithDefault(d FilterFunc) FilterSetOption {
 func NewFilterSet(opts ...FilterSetOption) *FilterSet {
 	h := &FilterSet{
 		Filters:       make([]FilterFunc, 0),
-		DefaultFilter: If(IsMessageSend()).Then(DeliverMessage()),
+		DefaultFilter: If(sm.IsMessageSend()).Then(DeliverMessage()),
 	}
 	for _, o := range opts {
 		o(h)
@@ -36,7 +39,7 @@ func NewFilterSet(opts ...FilterSetOption) *FilterSet {
 	return h
 }
 
-func (c *FilterSet) addStateMachine(sm *StateMachine) {
+func (c *FilterSet) addStateMachine(sm *sm.StateMachine) {
 	c.Filters = append(
 		[]FilterFunc{NewStateMachineHandler(sm)},
 		c.Filters...,

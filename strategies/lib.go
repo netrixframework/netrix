@@ -6,25 +6,24 @@ import (
 	"github.com/netrixframework/netrix/context"
 	"github.com/netrixframework/netrix/dispatcher"
 	"github.com/netrixframework/netrix/log"
+	"github.com/netrixframework/netrix/sm"
 	"github.com/netrixframework/netrix/types"
 )
 
 type Context struct {
-	Replicas     *types.ReplicaStore
-	Messages     *types.Map[types.MessageID, *types.Message]
-	EventDAG     *types.EventDAG
-	Logger       *log.Logger
+	*sm.Context
 	curIteration int
+	abortCh      chan struct{}
+	once         *sync.Once
 	lock         *sync.Mutex
 }
 
 func newContext(ctx *context.RootContext) *Context {
 	return &Context{
-		Replicas:     ctx.Replicas,
-		Messages:     ctx.MessageStore,
-		EventDAG:     types.NewEventDag(ctx.Replicas),
-		Logger:       ctx.Logger,
+		Context:      sm.NewContext(ctx, ctx.Logger),
 		curIteration: 0,
+		abortCh:      make(chan struct{}),
+		once:         new(sync.Once),
 		lock:         new(sync.Mutex),
 	}
 }
@@ -44,6 +43,16 @@ func (c *Context) NextIteration() {
 	c.EventDAG.Reset()
 }
 
+func (c *Context) AbortCh() <-chan struct{} {
+	return c.abortCh
+}
+
+func (c *Context) Abort() {
+	c.once.Do(func() {
+		close(c.abortCh)
+	})
+}
+
 type Action struct {
 	Name string
 	Do   func(*Context, *dispatcher.Dispatcher) error
@@ -53,8 +62,8 @@ func DeliverMessage(m *types.Message) Action {
 	return Action{
 		Name: "DeliverMessage",
 		Do: func(ctx *Context, d *dispatcher.Dispatcher) error {
-			if !ctx.Messages.Exists(m.ID) {
-				ctx.Messages.Add(m.ID, m)
+			if !ctx.MessagePool.Exists(m.ID) {
+				ctx.MessagePool.Add(m.ID, m)
 			}
 			return d.DispatchMessage(m)
 		},

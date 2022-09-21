@@ -1,6 +1,7 @@
 package testlib
 
 import (
+	"github.com/netrixframework/netrix/sm"
 	"github.com/netrixframework/netrix/types"
 )
 
@@ -9,12 +10,12 @@ type Action func(*types.Event, *Context) []*types.Message
 
 // IfThenHandler struct is used to wrap the attributes of the `If().Then()` handler
 type IfThenHandler struct {
-	cond    Condition
+	cond    sm.Condition
 	actions []Action
 }
 
 // If creates a IfThenHandler with the specified condition
-func If(cond Condition) *IfThenHandler {
+func If(cond sm.Condition) *IfThenHandler {
 	return &IfThenHandler{
 		cond:    cond,
 		actions: make([]Action, 0),
@@ -27,7 +28,7 @@ func (i *IfThenHandler) Then(action Action, rest ...Action) FilterFunc {
 	i.actions = append(i.actions, action)
 	i.actions = append(i.actions, rest...)
 	return func(e *types.Event, c *Context) ([]*types.Message, bool) {
-		if i.cond(e, c) {
+		if i.cond(e, c.Context) {
 			result := make([]*types.Message, 0)
 			for _, h := range i.actions {
 				result = append(result, h(e, c)...)
@@ -60,10 +61,10 @@ func DropMessage() Action {
 	}
 }
 
-// Incr returns an action which increments the counter value
-func (c *CountWrapper) Incr() Action {
+// IncrCounter returns an action which increments the counter value
+func IncrCounter(c *sm.CountWrapper) Action {
 	return func(e *types.Event, ctx *Context) []*types.Message {
-		counter, ok := c.CounterFunc(e, ctx)
+		counter, ok := c.CounterFunc(e, ctx.Context)
 		if !ok {
 			return []*types.Message{}
 		}
@@ -74,9 +75,9 @@ func (c *CountWrapper) Incr() Action {
 
 // Store returns an action. If the event is a message send or receive,
 // the action adds the message to the message set
-func (s *SetWrapper) Store() Action {
+func StoreInSet(s *sm.SetWrapper) Action {
 	return func(e *types.Event, c *Context) []*types.Message {
-		set, ok := s.SetFunc(e, c)
+		set, ok := s.SetFunc(e, c.Context)
 		if !ok {
 			return []*types.Message{}
 		}
@@ -91,9 +92,9 @@ func (s *SetWrapper) Store() Action {
 
 // DeliverAll returns an action which inturn returns all the messages in the
 // message set and removes the messages from the set.
-func (s *SetWrapper) DeliverAll() Action {
+func DeliverAllFromSet(s *sm.SetWrapper) Action {
 	return func(e *types.Event, c *Context) []*types.Message {
-		set, ok := s.SetFunc(e, c)
+		set, ok := s.SetFunc(e, c.Context)
 		if !ok {
 			return []*types.Message{}
 		}

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/netrixframework/netrix/log"
+	"github.com/netrixframework/netrix/sm"
 	"github.com/netrixframework/netrix/types"
 )
 
@@ -20,7 +21,7 @@ type TestCase struct {
 	// Cascade instance of *HandlerCascade
 	Cascade *FilterSet
 	// StateMachine instance of *StateMachine to assert a property
-	StateMachine *StateMachine
+	StateMachine *sm.StateMachine
 	aborted      bool
 	// Logger to log information
 	Logger *log.Logger
@@ -42,7 +43,7 @@ func defaultAssertFunc(c *Context) bool {
 // - Start state where the execution starts from
 // - Fail state that can be used to fail the testcase
 // - Success state that can be used to indicate a success of the testcase
-func NewTestCase(name string, timeout time.Duration, sm *StateMachine, cascade *FilterSet) *TestCase {
+func NewTestCase(name string, timeout time.Duration, sm *sm.StateMachine, cascade *FilterSet) *TestCase {
 	cascade.addStateMachine(sm)
 	return &TestCase{
 		Name:         name,
@@ -73,7 +74,7 @@ func (t *TestCase) Abort() {
 }
 
 // Step is called to execute a step of the testcase with a new event
-func (t *TestCase) step(e *types.Event, c *Context) []*types.Message {
+func (t *TestCase) Step(e *types.Event, c *Context) []*types.Message {
 	return t.Cascade.handleEvent(e, c)
 }
 

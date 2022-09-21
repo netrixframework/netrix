@@ -326,3 +326,10 @@ func (l *List[V]) RemoveAll() []V {
 	l.size = 0
 	return result
 }
+
+func Max[T constraints.Ordered](one, two T) T {
+	if one > two {
+		return one
+	}
+	return two
+}

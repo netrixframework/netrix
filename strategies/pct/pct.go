@@ -9,9 +9,11 @@ import (
 )
 
 type PCTStrategyConfig struct {
-	RandSrc   rand.Source
-	MaxEvents int
-	Depth     int
+	RandSrc        rand.Source
+	MaxEvents      int
+	Depth          int
+	MessageOrder   MessageOrder
+	RecordFilePath string
 }
 
 type PCTStrategy struct {
@@ -23,13 +25,19 @@ type PCTStrategy struct {
 	totalChains       int
 	config            *PCTStrategyConfig
 	rand              *rand.Rand
+	mo                MessageOrder
 	chainPartition    *ChainPartition
 	lock              *sync.Mutex
+	records           *records
 }
 
 var _ strategies.Strategy = &PCTStrategy{}
 
 func NewPCTStrategy(config *PCTStrategyConfig) *PCTStrategy {
+	var messageOrder MessageOrder = NewDefaultMessageOrder()
+	if config.MessageOrder != nil {
+		messageOrder = config.MessageOrder
+	}
 	strategy := &PCTStrategy{
 		BaseService:       types.NewBaseService("pctStrategy", nil),
 		rand:              rand.New(config.RandSrc),
@@ -38,10 +46,13 @@ func NewPCTStrategy(config *PCTStrategyConfig) *PCTStrategy {
 		priorityChangePts: make([]int, config.Depth-1),
 		totalChains:       0,
 		config:            config,
-		chainPartition:    NewChainPartition(),
+		mo:                messageOrder,
+		chainPartition:    NewChainPartition(messageOrder),
 		lock:              new(sync.Mutex),
+		records:           newRecords(config.RecordFilePath),
 	}
 	strategy.setup()
+	strategy.records.NextIteration(0, strategy.priorityChangePts)
 	return strategy
 }
 
@@ -65,45 +76,35 @@ func (p *PCTStrategy) setup() {
 		}
 	}
 	p.chainPartition.Reset()
+	p.mo.Reset()
 }
 
-func (p *PCTStrategy) Step(e *types.Event, ctx *strategies.Context) strategies.Action {
-
-	// TODO: Need to update the event partial order when message send and receive events are observed.
-
-	if e.IsMessageSend() {
-		// PCTCP addNewEvent method
-		messageID, _ := e.MessageID()
-		message, ok := ctx.Messages.Get(messageID)
-		if !ok {
-			return strategies.DoNothing()
-		}
-		pctEvent := NewEvent(message)
-
-		chainID, new := p.chainPartition.AddEvent(pctEvent)
-		if new {
-			p.lock.Lock()
-			newPriority := p.rand.Intn(p.totalChains) + p.config.Depth
-			p.priorityMap.Add(chainID, newPriority)
-			p.totalChains = p.totalChains + 1
-			p.lock.Unlock()
-		}
-
+func (p *PCTStrategy) AddMessage(m *Message, ctx *strategies.Context) {
+	chainID, new := p.chainPartition.AddEvent(m)
+	if new {
 		p.lock.Lock()
-		p.totalEvents = p.totalEvents + 1
-		for i, changePt := range p.priorityChangePts {
-			if p.totalEvents == changePt {
-				pctEvent.label = i
-			}
-		}
+		p.records.IncrChains(ctx.CurIteration())
+		p.totalChains = p.totalChains + 1
+		newPriority := p.rand.Intn(p.totalChains) + p.config.Depth
+		p.priorityMap.Add(chainID, newPriority)
 		p.lock.Unlock()
 	}
 
-	// PCTCP scheduleEvent method
-	enabledChains := p.chainPartition.EnabledChains()
+	p.lock.Lock()
+	p.totalEvents = p.totalEvents + 1
+	p.records.IncrEvents(ctx.CurIteration())
+	for i, changePt := range p.priorityChangePts {
+		if p.totalEvents == changePt {
+			m.label = i
+		}
+	}
+	p.lock.Unlock()
+}
+
+func (p *PCTStrategy) Schedule() (*Message, bool) {
 	highestPriority := 0
-	var theEvent *Event = nil
-	for _, chainID := range enabledChains {
+	var theEvent *Message = nil
+	for _, chainID := range p.chainPartition.EnabledChains() {
 		priority, ok := p.priorityMap.Get(chainID)
 		if !ok {
 			continue
@@ -120,9 +121,30 @@ func (p *PCTStrategy) Step(e *types.Event, ctx *strategies.Context) strategies.A
 			theEvent = enabledEvent
 		}
 	}
+	return theEvent, theEvent != nil
+}
 
-	if theEvent != nil {
-		message, ok := ctx.Messages.Get(theEvent.messageID)
+func (p *PCTStrategy) Step(e *types.Event, ctx *strategies.Context) strategies.Action {
+
+	if e.IsMessageSend() {
+		// PCTCP addNewEvent method
+		message, ok := ctx.GetMessage(e)
+		if !ok {
+			return strategies.DoNothing()
+		}
+		p.mo.AddSendEvent(message)
+		p.AddMessage(NewMessage(message), ctx)
+	} else if e.IsMessageReceive() {
+		message, ok := ctx.GetMessage(e)
+		if ok {
+			p.mo.AddRecvEvent(message)
+		}
+	}
+
+	// PCTCP scheduleEvent method
+	theEvent, ok := p.Schedule()
+	if ok {
+		message, ok := ctx.MessagePool.Get(theEvent.messageID)
 		if ok {
 			return strategies.DeliverMessage(message)
 		}
@@ -131,13 +153,18 @@ func (p *PCTStrategy) Step(e *types.Event, ctx *strategies.Context) strategies.A
 }
 
 func (p *PCTStrategy) EndCurIteration(_ *strategies.Context) {
+
 }
 
-func (p *PCTStrategy) NextIteration(_ *strategies.Context) {
+func (p *PCTStrategy) NextIteration(ctx *strategies.Context) {
 	p.setup()
+	p.lock.Lock()
+	p.records.NextIteration(ctx.CurIteration(), p.priorityChangePts)
+	p.lock.Unlock()
 }
 
 func (p *PCTStrategy) Finalize(_ *strategies.Context) {
+	p.records.Summarize()
 }
 
 func (p *PCTStrategy) Start() error {

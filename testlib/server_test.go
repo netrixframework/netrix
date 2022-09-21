@@ -10,6 +10,7 @@ import (
 
 	"github.com/netrixframework/netrix/config"
 	"github.com/netrixframework/netrix/log"
+	"github.com/netrixframework/netrix/sm"
 )
 
 func TestTestingServer(t *testing.T) {
@@ -18,7 +19,7 @@ func TestTestingServer(t *testing.T) {
 
 	srv, err := NewTestingServer(&config.Config{
 		APIServerAddr: "192.168.0.2:7074",
-	}, nil, []*TestCase{NewTestCase("dummy", 2*time.Second, NewStateMachine(), NewFilterSet())})
+	}, nil, []*TestCase{NewTestCase("dummy", 2*time.Second, sm.NewStateMachine(), NewFilterSet())})
 
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)

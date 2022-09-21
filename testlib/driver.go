@@ -14,7 +14,7 @@ type TestCaseDriver struct {
 func NewTestDriver(ctx *context.RootContext, testcase *TestCase) *TestCaseDriver {
 	return &TestCaseDriver{
 		TestCase: testcase,
-		ctx:      newContext(ctx, testcase),
+		ctx:      NewContext(ctx, testcase),
 	}
 }
 
@@ -25,9 +25,9 @@ func (d *TestCaseDriver) Step(e *types.Event) []*types.Message {
 		"replica":    string(e.Replica),
 		"event_type": e.TypeS,
 	})
-	d.ctx.setEvent(e)
+	d.ctx.EventDAG.AddNode(e, []*types.Event{})
 	d.TestCase.Logger.With(log.LogParams{"event_id": e.ID, "type": e.TypeS}).Debug("Stepping")
-	messages := d.TestCase.step(e, d.ctx)
+	messages := d.TestCase.Step(e, d.ctx)
 
 	for _, m := range messages {
 		if !d.ctx.MessagePool.Exists(m.ID) {

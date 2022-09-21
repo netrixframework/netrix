@@ -159,8 +159,7 @@ func (t *TimeoutStrategy) Step(e *types.Event, ctx *strategies.Context) strategi
 	if !t.config.Nondeterministic {
 		actions := make([]strategies.Action, 0)
 		if e.IsMessageSend() {
-			mID, _ := e.MessageID()
-			message, ok := ctx.Messages.Get(mID)
+			message, ok := ctx.GetMessage(e)
 			if ok {
 				actions = append(actions, strategies.DeliverMessage(message))
 			}
@@ -310,7 +309,7 @@ func (t *TimeoutStrategy) EndCurIteration(ctx *strategies.Context) {
 		spurious := false
 		var expr *z3.AST = nil
 		opts := make(map[string]*z3.OptimizedValue)
-		for _, r := range ctx.Replicas.Iter() {
+		for _, r := range ctx.ReplicaStore.Iter() {
 			e, ok := ctx.EventDAG.GetLatestNode(r.ID)
 			if ok {
 				symb, ok := t.symbolMap.Get(fmt.Sprintf("e_%d", e.ID))

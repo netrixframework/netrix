@@ -32,7 +32,7 @@ func (d *DummyStrategy) Step(event *types.Event, c *Context) Action {
 		return DoNothing()
 	}
 	messageID, _ := event.MessageID()
-	message, ok := c.Messages.Get(messageID)
+	message, ok := c.MessagePool.Get(messageID)
 	if ok {
 		d.Logger.With(log.LogParams{
 			"message_id": messageID,

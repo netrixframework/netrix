@@ -42,7 +42,7 @@ func (t *TimeoutStrategy) updatePendingEvents(e *types.Event, ctx *strategies.Co
 	var pEvent *pendingEvent = nil
 	if e.IsMessageSend() {
 		messageID, _ := e.MessageID()
-		message, ok := ctx.Messages.Get(messageID)
+		message, ok := ctx.MessagePool.Get(messageID)
 		if !ok {
 			// t.Logger.With(log.LogParams{"message_id": messageID}).Debug("no message found!")
 			return

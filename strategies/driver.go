@@ -162,6 +162,7 @@ func (d *Driver) main() error {
 			return nil
 		case <-d.QuitCh():
 			return nil
+		case <-d.strategyCtx.AbortCh():
 		case <-time.After(d.config.IterationTimeout):
 		}
 		d.blockEvents()
