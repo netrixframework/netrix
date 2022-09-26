@@ -4,18 +4,16 @@ import (
 	"github.com/netrixframework/netrix/apiserver"
 	"github.com/netrixframework/netrix/config"
 	"github.com/netrixframework/netrix/context"
-	"github.com/netrixframework/netrix/dispatcher"
 	"github.com/netrixframework/netrix/log"
 	"github.com/netrixframework/netrix/types"
 )
 
 // TestingServer is used to run the scheduler tool for unit testing
 type TestingServer struct {
-	apiserver  *apiserver.APIServer
-	dispatcher *dispatcher.Dispatcher
-	ctx        *context.RootContext
-	messageCh  chan *types.Message
-	eventCh    chan *types.Event
+	apiserver *apiserver.APIServer
+	ctx       *context.RootContext
+	messageCh chan *types.Message
+	eventCh   chan *types.Event
 
 	doneCh chan string
 
@@ -32,7 +30,6 @@ func NewTestingServer(config *config.Config, messageParser types.MessageParser, 
 
 	server := &TestingServer{
 		apiserver:      nil,
-		dispatcher:     dispatcher.NewDispatcher(ctx),
 		ctx:            ctx,
 		messageCh:      ctx.MessageQueue.Subscribe("testingServer"),
 		eventCh:        ctx.EventQueue.Subscribe("testingServer"),

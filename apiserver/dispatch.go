@@ -1,4 +1,4 @@
-package dispatcher
+package apiserver
 
 import (
 	"bytes"
@@ -6,9 +6,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/http"
-	"sync"
 
-	"github.com/netrixframework/netrix/context"
 	"github.com/netrixframework/netrix/log"
 	"github.com/netrixframework/netrix/types"
 )
@@ -47,45 +45,21 @@ type directiveMessage struct {
 	Action string `json:"action"`
 }
 
-// Dispatcher should be used to send messages to the replicas and handles the marshalling of messages
-type Dispatcher struct {
-	// Replicas an instance of the replica store
-	Replicas *types.ReplicaStore
-	logger   *log.Logger
-
-	clients            map[types.ReplicaID]*http.Client
-	dispatchedMessages map[types.MessageID]bool
-	lock               *sync.Mutex
-}
-
-// NewDispatcher instantiates a new instance of Dispatcher
-func NewDispatcher(ctx *context.RootContext) *Dispatcher {
-	return &Dispatcher{
-		Replicas:           ctx.Replicas,
-		logger:             ctx.Logger.With(log.LogParams{"service": "dispatcher"}),
-		clients:            make(map[types.ReplicaID]*http.Client),
-		dispatchedMessages: make(map[types.MessageID]bool),
-		lock:               new(sync.Mutex),
-	}
-}
-
-// DispatchMessage should be called to send an _intercepted_ message to a replica
-// DispatchMessage sends a message with a particular ID only once,
-// will return ErrDuplicateDispatch on successive calls
-func (d *Dispatcher) DispatchMessage(msg *types.Message) error {
-	d.lock.Lock()
-	_, ok := d.dispatchedMessages[msg.ID]
+func (a *APIServer) SendMessage(msg *types.Message) error {
+	a.lock.Lock()
+	_, ok := a.dispatchedMessages[msg.ID]
 	if ok {
-		d.lock.Unlock()
+		a.lock.Unlock()
 		return ErrDuplicateDispatch
 	}
-	d.dispatchedMessages[msg.ID] = true
-	d.lock.Unlock()
+	a.dispatchedMessages[msg.ID] = true
+	_, block := a.resetReplicas[msg.To]
+	a.lock.Unlock()
+	if block {
+		return nil
+	}
 
-	d.logger.With(log.LogParams{
-		"message_id": msg.ID,
-	}).Debug("Dispatching message")
-	replica, ok := d.Replicas.Get(msg.To)
+	replica, ok := a.ctx.Replicas.Get(msg.To)
 	if !ok {
 		return ErrDestUnknown
 	}
@@ -93,21 +67,24 @@ func (d *Dispatcher) DispatchMessage(msg *types.Message) error {
 	if err != nil {
 		return ErrFailedMarshal
 	}
-	_, err = d.sendReq(replica, "/message", bytes)
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err = a.sendReq(replica, "/message", bytes)
+	return err
+}
+
+func (a *APIServer) ForgetSentMessages() {
+	a.lock.Lock()
+	a.dispatchedMessages = make(map[types.MessageID]bool)
+	a.lock.Unlock()
 }
 
 // Send a timeout message to the replica
 // This is the equivalent of ending a timeout at the replica
-func (d *Dispatcher) DispatchTimeout(t *types.ReplicaTimeout) error {
-	d.logger.With(log.LogParams{
+func (d *APIServer) SendTimeout(t *types.ReplicaTimeout) error {
+	d.Logger.With(log.LogParams{
 		"timeout_type": t.Type,
 		"duration":     t.Duration.String(),
 	}).Debug("Dispatching timeout")
-	replica, ok := d.Replicas.Get(t.Replica)
+	replica, ok := d.ctx.Replicas.Get(t.Replica)
 	if !ok {
 		return ErrDestUnknown
 	}
@@ -123,8 +100,8 @@ func (d *Dispatcher) DispatchTimeout(t *types.ReplicaTimeout) error {
 }
 
 // StopReplica should be called to direct the replica to stop running
-func (d *Dispatcher) StopReplica(replica types.ReplicaID) error {
-	replicaS, ok := d.Replicas.Get(replica)
+func (d *APIServer) StopReplica(replica types.ReplicaID) error {
+	replicaS, ok := d.ctx.Replicas.Get(replica)
 	if !ok {
 		return ErrDestUnknown
 	}
@@ -132,8 +109,8 @@ func (d *Dispatcher) StopReplica(replica types.ReplicaID) error {
 }
 
 // StartReplica should be called to direct the replica to start running
-func (d *Dispatcher) StartReplica(replica types.ReplicaID) error {
-	replicaS, ok := d.Replicas.Get(replica)
+func (d *APIServer) StartReplica(replica types.ReplicaID) error {
+	replicaS, ok := d.ctx.Replicas.Get(replica)
 	if !ok {
 		return ErrDestUnknown
 	}
@@ -141,23 +118,31 @@ func (d *Dispatcher) StartReplica(replica types.ReplicaID) error {
 }
 
 // RestartReplica should be called to direct the replica to restart
-func (d *Dispatcher) RestartReplica(replica types.ReplicaID) error {
-	replicaS, ok := d.Replicas.Get(replica)
+func (d *APIServer) RestartReplica(replica types.ReplicaID) error {
+	replicaS, ok := d.ctx.Replicas.Get(replica)
 	if !ok {
 		return ErrDestUnknown
 	}
+	d.lock.Lock()
+	d.resetReplicas[replica] = true
+	d.lock.Unlock()
 	return d.sendDirective(restartAction, replicaS)
 }
 
 // RestartAll restarts all the replicas
-func (d *Dispatcher) RestartAll() error {
-	errCh := make(chan error, d.Replicas.Cap())
-	for _, r := range d.Replicas.Iter() {
+func (d *APIServer) RestartAll() error {
+	errCh := make(chan error, d.ctx.Replicas.Cap())
+	for _, r := range d.ctx.Replicas.Iter() {
+		d.lock.Lock()
+		d.resetReplicas[r.ID] = true
+		d.lock.Unlock()
+	}
+	for _, r := range d.ctx.Replicas.Iter() {
 		go func(errCh chan error, replica *types.Replica) {
 			errCh <- d.sendDirective(restartAction, replica)
 		}(errCh, r)
 	}
-	for i := 0; i < d.Replicas.Cap(); i++ {
+	for i := 0; i < d.ctx.Replicas.Cap(); i++ {
 		err := <-errCh
 		if err != nil {
 			return err
@@ -166,11 +151,12 @@ func (d *Dispatcher) RestartAll() error {
 	return nil
 }
 
-func (d *Dispatcher) sendDirective(directive *directiveMessage, to *types.Replica) error {
-	d.logger.With(log.LogParams{
+func (d *APIServer) sendDirective(directive *directiveMessage, to *types.Replica) error {
+	d.Logger.With(log.LogParams{
 		"action":  directive.Action,
 		"replica": to.ID,
 	}).Debug("Dispatching directive!")
+
 	bytes, err := json.Marshal(directive)
 	if err != nil {
 		return ErrFailedMarshal
@@ -182,9 +168,9 @@ func (d *Dispatcher) sendDirective(directive *directiveMessage, to *types.Replic
 	return nil
 }
 
-func (d *Dispatcher) sendReq(to *types.Replica, path string, msg []byte) (string, error) {
-	d.lock.Lock()
-	client, ok := d.clients[to.ID]
+func (a *APIServer) sendReq(to *types.Replica, path string, msg []byte) (string, error) {
+	a.lock.Lock()
+	client, ok := a.clients[to.ID]
 	if !ok {
 		// Creating a keep-alive client
 		client = &http.Client{
@@ -193,9 +179,9 @@ func (d *Dispatcher) sendReq(to *types.Replica, path string, msg []byte) (string
 				MaxConnsPerHost:     1,
 			},
 		}
-		d.clients[to.ID] = client
+		a.clients[to.ID] = client
 	}
-	d.lock.Unlock()
+	a.lock.Unlock()
 
 	req, err := http.NewRequest(http.MethodPost, "http://"+to.Addr+path, bytes.NewBuffer([]byte(msg)))
 	if err != nil {

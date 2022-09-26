@@ -8,22 +8,22 @@ import (
 	"github.com/netrixframework/netrix/types"
 )
 
-type PCTStrategyWithTest struct {
+type PCTStrategyWithTestCase struct {
 	*PCTStrategy
 	testCase    *testlib.TestCase
 	testCaseCtx *testlib.Context
 	lock        *sync.Mutex
 }
 
-func NewPCTStrategyWithTest(config *PCTStrategyConfig, testCase *testlib.TestCase) *PCTStrategyWithTest {
-	return &PCTStrategyWithTest{
+func NewPCTStrategyWithTestCase(config *PCTStrategyConfig, testCase *testlib.TestCase) *PCTStrategyWithTestCase {
+	return &PCTStrategyWithTestCase{
 		PCTStrategy: NewPCTStrategy(config),
 		testCase:    testCase,
 		lock:        new(sync.Mutex),
 	}
 }
 
-func (p *PCTStrategyWithTest) Step(e *types.Event, ctx *strategies.Context) strategies.Action {
+func (p *PCTStrategyWithTestCase) Step(e *types.Event, ctx *strategies.Context) strategies.Action {
 	p.lock.Lock()
 	if p.testCaseCtx == nil {
 		p.testCaseCtx = testlib.NewContextFrom(ctx.Context, p.testCase)
@@ -53,7 +53,7 @@ func (p *PCTStrategyWithTest) Step(e *types.Event, ctx *strategies.Context) stra
 	return strategies.DoNothing()
 }
 
-func (p *PCTStrategyWithTest) EndCurIteration(ctx *strategies.Context) {
+func (p *PCTStrategyWithTestCase) EndCurIteration(ctx *strategies.Context) {
 	p.lock.Lock()
 	p.testCaseCtx = nil
 	p.lock.Unlock()
@@ -61,9 +61,10 @@ func (p *PCTStrategyWithTest) EndCurIteration(ctx *strategies.Context) {
 	p.PCTStrategy.EndCurIteration(ctx)
 }
 
-func (p *PCTStrategyWithTest) NextIteration(ctx *strategies.Context) {
+func (p *PCTStrategyWithTestCase) NextIteration(ctx *strategies.Context) {
 	p.lock.Lock()
 	p.testCaseCtx = testlib.NewContextFrom(ctx.Context, p.testCase)
+	p.testCase.Setup(p.testCaseCtx)
 	p.lock.Unlock()
 
 	p.PCTStrategy.NextIteration(ctx)

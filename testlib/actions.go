@@ -1,6 +1,8 @@
 package testlib
 
 import (
+	"fmt"
+
 	"github.com/netrixframework/netrix/sm"
 	"github.com/netrixframework/netrix/types"
 )
@@ -117,11 +119,11 @@ func RecordMessageAs(label string) Action {
 	}
 }
 
-func OnceAction(action Action) Action {
-	done := false
+func OnceAction(name string, action Action) Action {
 	return func(e *types.Event, ctx *Context) []*types.Message {
-		if !done {
-			done = true
+		key := fmt.Sprintf("%s_action_once", name)
+		if !ctx.Vars.Exists(key) {
+			ctx.Vars.Set(key, true)
 			return action(e, ctx)
 		}
 		return []*types.Message{}

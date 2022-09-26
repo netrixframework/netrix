@@ -26,6 +26,14 @@ func (srv *APIServer) HandleMessage(c *gin.Context) {
 		return
 	}
 
+	srv.lock.Lock()
+	_, block := srv.resetReplicas[msg.From]
+	srv.lock.Unlock()
+	if block {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		return
+	}
+
 	msg.Parse(srv.messageParser)
 
 	srv.ctx.MessageStore.Add(msg.ID, &msg)
@@ -41,6 +49,11 @@ func (srv *APIServer) HandleReplicaPost(c *gin.Context) {
 		srv.Logger.With(log.LogParams{"error": err}).Debug("Bad replica request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to unmarshal request"})
 		return
+	}
+	if replica.Ready {
+		srv.lock.Lock()
+		delete(srv.resetReplicas, replica.ID)
+		srv.lock.Unlock()
 	}
 
 	srv.Logger.With(log.LogParams{
@@ -65,6 +78,13 @@ func (srv *APIServer) HandleEvent(c *gin.Context) {
 	if err := c.ShouldBindJSON(&e); err != nil {
 		srv.Logger.With(log.LogParams{"error": err}).Debug("Bad event request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to unmarshal request"})
+		return
+	}
+	srv.lock.Lock()
+	_, block := srv.resetReplicas[e.Replica]
+	srv.lock.Unlock()
+	if block {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 		return
 	}
 	srv.Logger.With(log.LogParams{

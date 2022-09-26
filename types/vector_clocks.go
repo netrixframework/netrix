@@ -1,47 +1,37 @@
 package types
 
-type ClockValue []float64
+type ClockValue map[ReplicaID]int
 
-func ZeroClock(replicas int) ClockValue {
-	return make([]float64, replicas)
+func ZeroClock() ClockValue {
+	return make(map[ReplicaID]int)
 }
 
+// Lt returns true if c < other
 func (c ClockValue) Lt(other ClockValue) bool {
-	if len(c) != len(other) {
-		return false
-	}
 	oneless := false
-	for i := 0; i < len(c); i++ {
-		if c[i] > other[i] {
+	for replica, v1 := range c {
+		v2, ok := other[replica]
+		if ok && v1 < v2 {
+			oneless = true
+		} else if ok && v1 > v2 {
 			return false
 		}
-		if c[i] < other[i] {
-			oneless = true
-		}
+
 	}
 	return oneless
 }
 
-func (c ClockValue) Eq(other ClockValue) bool {
-	if len(c) != len(other) {
-		return false
+func (c ClockValue) Next(replica ReplicaID) ClockValue {
+	new := ZeroClock()
+	for r, val := range c {
+		new[r] = val
 	}
-	for i := 0; i < len(c); i++ {
-		if c[i] != other[i] {
-			return false
-		}
-	}
-	return true
-}
 
-type GlobalClock struct {
-	dag          *EventDAG
-	messageStore *Map[string, *Message]
-}
-
-func NewGlobalClock(dag *EventDAG, messageStore *Map[string, *Message]) *GlobalClock {
-	return &GlobalClock{
-		dag:          dag,
-		messageStore: messageStore,
+	cur, ok := c[replica]
+	if !ok {
+		new[replica] = 0
+	} else {
+		new[replica] = cur + 1
 	}
+	return new
 }

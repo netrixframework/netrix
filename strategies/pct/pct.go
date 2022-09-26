@@ -51,8 +51,6 @@ func NewPCTStrategy(config *PCTStrategyConfig) *PCTStrategy {
 		lock:              new(sync.Mutex),
 		records:           newRecords(config.RecordFilePath),
 	}
-	strategy.setup()
-	strategy.records.NextIteration(0, strategy.priorityChangePts)
 	return strategy
 }
 
@@ -82,12 +80,12 @@ func (p *PCTStrategy) setup() {
 func (p *PCTStrategy) AddMessage(m *Message, ctx *strategies.Context) {
 	chainID, new := p.chainPartition.AddEvent(m)
 	if new {
-		p.lock.Lock()
 		p.records.IncrChains(ctx.CurIteration())
+		p.lock.Lock()
 		p.totalChains = p.totalChains + 1
 		newPriority := p.rand.Intn(p.totalChains) + p.config.Depth
-		p.priorityMap.Add(chainID, newPriority)
 		p.lock.Unlock()
+		p.priorityMap.Add(chainID, newPriority)
 	}
 
 	p.lock.Lock()
@@ -104,6 +102,7 @@ func (p *PCTStrategy) AddMessage(m *Message, ctx *strategies.Context) {
 func (p *PCTStrategy) Schedule() (*Message, bool) {
 	highestPriority := 0
 	var theEvent *Message = nil
+	var eventChainID int
 	for _, chainID := range p.chainPartition.EnabledChains() {
 		priority, ok := p.priorityMap.Get(chainID)
 		if !ok {
@@ -119,9 +118,14 @@ func (p *PCTStrategy) Schedule() (*Message, bool) {
 		if priority > highestPriority {
 			highestPriority = priority
 			theEvent = enabledEvent
+			eventChainID = chainID
 		}
 	}
-	return theEvent, theEvent != nil
+	if theEvent != nil {
+		p.chainPartition.MarkScheduled(eventChainID)
+		return theEvent, true
+	}
+	return nil, false
 }
 
 func (p *PCTStrategy) Step(e *types.Event, ctx *strategies.Context) strategies.Action {

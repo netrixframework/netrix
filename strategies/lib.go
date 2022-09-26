@@ -3,8 +3,8 @@ package strategies
 import (
 	"sync"
 
+	"github.com/netrixframework/netrix/apiserver"
 	"github.com/netrixframework/netrix/context"
-	"github.com/netrixframework/netrix/dispatcher"
 	"github.com/netrixframework/netrix/log"
 	"github.com/netrixframework/netrix/sm"
 	"github.com/netrixframework/netrix/types"
@@ -41,6 +41,7 @@ func (c *Context) NextIteration() {
 
 	c.curIteration++
 	c.EventDAG.Reset()
+	c.Vars.Reset()
 }
 
 func (c *Context) AbortCh() <-chan struct{} {
@@ -55,17 +56,17 @@ func (c *Context) Abort() {
 
 type Action struct {
 	Name string
-	Do   func(*Context, *dispatcher.Dispatcher) error
+	Do   func(*Context, *apiserver.APIServer) error
 }
 
 func DeliverMessage(m *types.Message) Action {
 	return Action{
 		Name: "DeliverMessage",
-		Do: func(ctx *Context, d *dispatcher.Dispatcher) error {
+		Do: func(ctx *Context, d *apiserver.APIServer) error {
 			if !ctx.MessagePool.Exists(m.ID) {
 				ctx.MessagePool.Add(m.ID, m)
 			}
-			return d.DispatchMessage(m)
+			return d.SendMessage(m)
 		},
 	}
 }
@@ -75,7 +76,7 @@ var doNothingAction = "_nothing"
 func DoNothing() Action {
 	return Action{
 		Name: doNothingAction,
-		Do: func(ctx *Context, d *dispatcher.Dispatcher) error {
+		Do: func(ctx *Context, d *apiserver.APIServer) error {
 			return nil
 		},
 	}
@@ -84,7 +85,7 @@ func DoNothing() Action {
 func ActionSequence(actions ...Action) Action {
 	return Action{
 		Name: "Sequence",
-		Do: func(ctx *Context, d *dispatcher.Dispatcher) error {
+		Do: func(ctx *Context, d *apiserver.APIServer) error {
 			for _, action := range actions {
 				ctx.Logger.With(log.LogParams{"action": action.Name}).Debug("Calling action")
 				if err := action.Do(ctx, d); err != nil {

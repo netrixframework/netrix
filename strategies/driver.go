@@ -9,9 +9,13 @@ import (
 	"github.com/netrixframework/netrix/apiserver"
 	"github.com/netrixframework/netrix/config"
 	"github.com/netrixframework/netrix/context"
-	"github.com/netrixframework/netrix/dispatcher"
 	"github.com/netrixframework/netrix/log"
 	"github.com/netrixframework/netrix/types"
+)
+
+var (
+	errStrategyQuit = errors.New("quit signalled")
+	errDriverStop   = errors.New("strategy diver signalled stop")
 )
 
 // StrategyConfig store the config used for running strategies
@@ -29,12 +33,11 @@ type StrategyConfig struct {
 }
 
 type Driver struct {
-	strategy   Strategy
-	apiserver  *apiserver.APIServer
-	dispatcher *dispatcher.Dispatcher
-	ctx        *context.RootContext
+	strategy  Strategy
+	apiserver *apiserver.APIServer
+	ctx       *context.RootContext
 
-	eventCh       chan *types.Event
+	eventQueue    *types.Queue[*types.Event]
 	receiveEvents bool
 	newIteration  bool
 	config        *StrategyConfig
@@ -54,8 +57,7 @@ func NewStrategyDriver(
 	ctx := context.NewRootContext(config, log.DefaultLogger)
 	d := &Driver{
 		strategy:      strategy,
-		dispatcher:    dispatcher.NewDispatcher(ctx),
-		eventCh:       ctx.EventQueue.Subscribe("StrategyDriver"),
+		eventQueue:    ctx.EventQueue,
 		ctx:           ctx,
 		config:        sConfig,
 		strategyCtx:   nil,
@@ -78,7 +80,10 @@ func (d *Driver) Start() error {
 	go d.poll()
 	d.strategy.Start()
 	if err := d.main(); err != nil {
-		return err
+		if err != errDriverStop && err != errStrategyQuit {
+			return err
+		}
+		return nil
 	}
 	d.Logger.Info("completed all iterations")
 	<-d.QuitCh()
@@ -97,38 +102,39 @@ func (d *Driver) poll() {
 	d.Logger.Info("Waiting for all replicas to connect ...")
 	d.waitForReplicas(false)
 	d.Logger.Info("All replicas connected!")
+
+EventLoop:
 	for {
-		if !d.canReceiveEvents() {
-			continue
-		}
 
 		select {
-		case event := <-d.eventCh:
-			d.lock.Lock()
-			newI := d.newIteration
-			d.lock.Unlock()
-			if newI && event.ID != 0 {
-				continue
-			} else if newI && event.ID == 0 {
-				d.lock.Lock()
-				d.newIteration = false
-				d.lock.Unlock()
-			}
-			d.strategyCtx.EventDAG.AddNode(event, []*types.Event{})
-			if d.config.StepFunc != nil {
-				d.config.StepFunc(event, d.strategyCtx)
-			}
-			go d.performAction(
-				d.strategy.Step(
-					event,
-					d.strategyCtx,
-				),
-			)
 		case <-d.strategy.QuitCh():
 			return
 		case <-d.QuitCh():
 			return
+		default:
 		}
+		if !d.canReceiveEvents() {
+			continue EventLoop
+		}
+
+		event, ok := d.eventQueue.Pop()
+		if !ok {
+			continue EventLoop
+		}
+
+		d.strategyCtx.EventDAG.AddNode(event, []*types.Event{})
+		if d.config.StepFunc != nil {
+			d.config.StepFunc(event, d.strategyCtx)
+		}
+		// d.Logger.Info("Stepping!")
+		action := d.strategy.Step(
+			event,
+			d.strategyCtx,
+		)
+		if !d.canReceiveEvents() {
+			continue EventLoop
+		}
+		d.performAction(action)
 	}
 }
 
@@ -139,7 +145,7 @@ func (d *Driver) performAction(action Action) error {
 	d.Logger.With(log.LogParams{
 		"action": action.Name,
 	}).Debug("Performing action")
-	return action.Do(d.strategyCtx, d.dispatcher)
+	return action.Do(d.strategyCtx, d.apiserver)
 }
 
 func (d *Driver) main() error {
@@ -154,50 +160,52 @@ func (d *Driver) main() error {
 		if d.config.SetupFunc != nil {
 			d.config.SetupFunc(d.strategyCtx)
 		}
+		d.strategy.NextIteration(d.strategyCtx)
 		d.unblockEvents()
 
 		d.Logger.Info(fmt.Sprintf("Starting iteration %d", d.strategyCtx.CurIteration()))
 		select {
 		case <-d.strategy.QuitCh():
-			return nil
+			d.strategy.Finalize(d.strategyCtx)
+			if d.config.FinalizeFunc != nil {
+				d.config.FinalizeFunc(d.strategyCtx)
+			}
+			return errStrategyQuit
 		case <-d.QuitCh():
-			return nil
+			d.strategy.Finalize(d.strategyCtx)
+			if d.config.FinalizeFunc != nil {
+				d.config.FinalizeFunc(d.strategyCtx)
+			}
+			return errDriverStop
 		case <-d.strategyCtx.AbortCh():
 		case <-time.After(d.config.IterationTimeout):
 		}
 		d.blockEvents()
 		d.Logger.Debug("Blocked events")
 
-		// d.flushEvents()
+		d.apiserver.RestartAll()
+		d.apiserver.ForgetSentMessages()
+		d.ctx.EventIDGen.Reset()
 
-		d.lock.Lock()
-		d.newIteration = true
-		d.lock.Unlock()
+		d.ctx.PauseQueues()
+		// Waiting for some time for the messages in transit
+		// time.Sleep(100 * time.Millisecond)
+
+		// d.lock.Lock()
+		// d.newIteration = true
+		// d.lock.Unlock()
 
 		d.strategy.EndCurIteration(d.strategyCtx)
-
 		d.strategyCtx.NextIteration()
-		d.strategy.NextIteration(d.strategyCtx)
 		d.ctx.Reset()
+		d.ctx.ResumeQueues()
 
-		d.dispatcher.RestartAll()
-		d.ctx.EventIDGen.Reset()
 	}
 	d.strategy.Finalize(d.strategyCtx)
 	if d.config.FinalizeFunc != nil {
 		d.config.FinalizeFunc(d.strategyCtx)
 	}
 	return nil
-}
-
-func (d *Driver) flushEvents() {
-	for {
-		l := len(d.eventCh)
-		if l == 0 {
-			break
-		}
-		<-d.eventCh
-	}
 }
 
 func (d *Driver) waitForReplicas(ready bool) error {

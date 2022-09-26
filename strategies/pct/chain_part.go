@@ -18,6 +18,7 @@ type Chain struct {
 
 func NewChain(id int, event *Message) *Chain {
 	chain := &Chain{
+		ID:                id,
 		events:            make([]*Message, 0),
 		lock:              new(sync.Mutex),
 		enabled:           true,
@@ -173,6 +174,13 @@ func (p *ChainPartition) GetEnabledEvent(chainID int) (*Message, bool) {
 	}
 
 	return chain.EnabledEvent()
+}
+
+func (p *ChainPartition) MarkScheduled(chainID int) {
+	chain, ok := p.Chains.Get(chainID)
+	if ok {
+		chain.IncrEnabledEvent()
+	}
 }
 
 func (p *ChainPartition) Reset() {

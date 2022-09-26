@@ -175,7 +175,7 @@ func NewEventDag(replicaStore *ReplicaStore) *EventDAG {
 		clockLock:    new(sync.Mutex),
 	}
 	for _, r := range replicaStore.Iter() {
-		d.latestClocks[r.ID] = ZeroClock(replicaStore.Cap())
+		d.latestClocks[r.ID] = ZeroClock()
 	}
 	return d
 }
@@ -192,28 +192,34 @@ func (d *EventDAG) Reset() {
 	d.clockLock.Lock()
 	d.latestClocks = make(map[ReplicaID]ClockValue)
 	for _, r := range d.replicaStore.Iter() {
-		d.latestClocks[r.ID] = ZeroClock(d.replicaStore.Cap())
+		d.latestClocks[r.ID] = ZeroClock()
 	}
 	d.clockLock.Unlock()
 }
 
 func (d *EventDAG) nextClock(e *EventNode, parents []*EventNode) ClockValue {
-	next := make([]float64, d.replicaStore.Cap())
+	next := make(map[ReplicaID]int)
 	d.clockLock.Lock()
 	latestClockValue := d.latestClocks[e.Event.Replica]
 	d.clockLock.Unlock()
-	for i, r := range d.replicaStore.Iter() {
-		maxParent := float64(0)
-		for _, p := range parents {
-			if p.ClockValue[i] > maxParent {
-				maxParent = p.ClockValue[i]
+	latestClockValue = latestClockValue.Next(e.Event.Replica)
+
+	clockValsToCmp := []ClockValue{latestClockValue}
+	for _, p := range parents {
+		clockValsToCmp = append(clockValsToCmp, p.ClockValue)
+	}
+
+	for _, r := range d.replicaStore.Iter() {
+		maxParent := 0
+		for _, c := range clockValsToCmp {
+			parentVal, ok := c[r.ID]
+			if ok && parentVal > maxParent {
+				maxParent = c[r.ID]
 			}
 		}
-		if r.ID == e.Event.Replica && maxParent < latestClockValue[i]+1 {
-			maxParent = latestClockValue[i] + 1
-		}
-		next[i] = maxParent
+		next[r.ID] = maxParent
 	}
+
 	d.clockLock.Lock()
 	d.latestClocks[e.Event.Replica] = next
 	d.clockLock.Unlock()

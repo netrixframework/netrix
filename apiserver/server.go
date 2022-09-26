@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"path"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -27,8 +28,12 @@ type APIServer struct {
 	dashboard     DashboardRouter
 	messageParser types.MessageParser
 
-	server *http.Server
-	addr   string
+	server             *http.Server
+	addr               string
+	clients            map[types.ReplicaID]*http.Client
+	dispatchedMessages map[types.MessageID]bool
+	resetReplicas      map[types.ReplicaID]bool
+	lock               *sync.Mutex
 
 	*types.BaseService
 }
@@ -42,7 +47,12 @@ func NewAPIServer(ctx *context.RootContext, messageParser types.MessageParser, d
 		addr:          ctx.Config.APIServerAddr,
 		dashboard:     dashboard,
 		messageParser: messageParser,
-		BaseService:   types.NewBaseService("APIServer", ctx.Logger),
+
+		clients:            make(map[types.ReplicaID]*http.Client),
+		dispatchedMessages: make(map[types.MessageID]bool),
+		resetReplicas:      make(map[types.ReplicaID]bool),
+		lock:               new(sync.Mutex),
+		BaseService:        types.NewBaseService("APIServer", ctx.Logger),
 	}
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()

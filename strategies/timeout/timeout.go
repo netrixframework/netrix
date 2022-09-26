@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/netrixframework/netrix/dispatcher"
+	"github.com/netrixframework/netrix/apiserver"
 	"github.com/netrixframework/netrix/log"
 	"github.com/netrixframework/netrix/strategies"
 	"github.com/netrixframework/netrix/types"
@@ -81,11 +81,11 @@ func (c *TimeoutStrategyConfig) driftMin(ctx *z3.Context) *z3.AST {
 func FireTimeout(t *types.ReplicaTimeout) strategies.Action {
 	return strategies.Action{
 		Name: "FireTimeout",
-		Do: func(ctx *strategies.Context, d *dispatcher.Dispatcher) error {
+		Do: func(ctx *strategies.Context, d *apiserver.APIServer) error {
 			ctx.Logger.With(log.LogParams{
 				"timeout": t.Key(),
 			}).Debug("Firing timeout")
-			return d.DispatchTimeout(t)
+			return d.SendTimeout(t)
 		},
 	}
 }

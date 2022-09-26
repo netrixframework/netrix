@@ -59,6 +59,24 @@ func (v *VarSet) Set(label string, value interface{}) {
 	v.vars[label] = value
 }
 
+func (v *VarSet) Keys() []string {
+	v.lock.Lock()
+	defer v.lock.Unlock()
+
+	keys := make([]string, 0)
+	for k := range v.vars {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+// Reset removes all vars in the varset
+func (v *VarSet) Reset() {
+	v.lock.Lock()
+	defer v.lock.Unlock()
+	v.vars = make(map[string]interface{})
+}
+
 // Exists returns true if there is a variable of the specified key
 func (v *VarSet) Exists(label string) bool {
 	v.lock.Lock()

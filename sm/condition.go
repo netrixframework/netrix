@@ -1,6 +1,10 @@
 package sm
 
-import "github.com/netrixframework/netrix/types"
+import (
+	"fmt"
+
+	"github.com/netrixframework/netrix/types"
+)
 
 type Condition func(e *types.Event, c *Context) bool
 
@@ -188,7 +192,7 @@ func (c *CountWrapper) LeqF(val func(*types.Event, *Context) (int, bool)) Condit
 	}
 }
 
-// GeqF condition that returns true if the counter value is greather than or equal to the specified value.
+// GeqF condition that returns true if the counter value is greater than or equal to the specified value.
 // The input is a function that obtains the value dynamically based on the event and context.
 func (c *CountWrapper) GeqF(val func(*types.Event, *Context) (int, bool)) Condition {
 	return func(e *types.Event, ctx *Context) bool {
@@ -274,29 +278,14 @@ func (s *SetWrapper) Contains() Condition {
 	}
 }
 
-type once struct {
-	done bool
-	c    Condition
-}
-
-func (o *once) check() Condition {
-	return func(e *types.Event, c *Context) bool {
-		if o.done {
-			return false
-		}
-		if o.c(e, c) {
-			o.done = true
-			return true
+// Once is a meta condition that allows the inner condition to be true only once
+func OnceCondition(name string, c Condition) Condition {
+	return func(e *types.Event, ctx *Context) bool {
+		key := fmt.Sprintf("%s_cond_once", name)
+		if !ctx.Vars.Exists(key) {
+			ctx.Vars.Set(key, true)
+			return c(e, ctx)
 		}
 		return false
 	}
-}
-
-// Once is a meta condition that allows the inner condition to be true only once
-func OnceCondition(c Condition) Condition {
-	o := &once{
-		done: false,
-		c:    c,
-	}
-	return o.check()
 }

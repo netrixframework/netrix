@@ -15,8 +15,8 @@ type TestCase struct {
 	Name string
 	// Timeout maximum duration of the testcase execution
 	Timeout time.Duration
-	// setup function called prior to initiation of the execution
-	setup    func(*Context) error
+	// Setup function called prior to initiation of the execution
+	Setup    func(*Context) error
 	assertFn func(*Context) bool
 	// Cascade instance of *HandlerCascade
 	Cascade *FilterSet
@@ -50,7 +50,7 @@ func NewTestCase(name string, timeout time.Duration, sm *sm.StateMachine, cascad
 		Timeout:      timeout,
 		Cascade:      cascade,
 		StateMachine: sm,
-		setup:        defaultSetupFunc,
+		Setup:        defaultSetupFunc,
 		assertFn:     defaultAssertFunc,
 		aborted:      false,
 		doneCh:       make(chan string, 1),
@@ -80,7 +80,7 @@ func (t *TestCase) Step(e *types.Event, c *Context) []*types.Message {
 
 // SetupFunc can be used to set the setup function
 func (t *TestCase) SetupFunc(setupFunc func(*Context) error) {
-	t.setup = setupFunc
+	t.Setup = setupFunc
 }
 
 func (t *TestCase) assert() bool {

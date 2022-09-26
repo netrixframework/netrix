@@ -60,3 +60,13 @@ func (c *RootContext) Reset() {
 
 	c.MessageStore.RemoveAll()
 }
+
+func (c *RootContext) PauseQueues() {
+	c.MessageQueue.Pause()
+	c.EventQueue.Pause()
+}
+
+func (c *RootContext) ResumeQueues() {
+	c.MessageQueue.Resume()
+	c.EventQueue.Resume()
+}

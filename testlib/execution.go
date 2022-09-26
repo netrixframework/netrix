@@ -132,7 +132,7 @@ MainLoop:
 		})
 		// TODO: Figure out a way to cleanly clear the message pool
 		// Reset the servers and flush the queues after waiting for some time
-		if err := srv.dispatcher.RestartAll(); err != nil {
+		if err := srv.apiserver.RestartAll(); err != nil {
 			srv.Logger.With(log.LogParams{"error": err}).Error("Failed to restart replicas! Aborting!")
 			break MainLoop
 		}
@@ -184,6 +184,6 @@ func (srv *TestingServer) pollMessages() {
 
 func (srv *TestingServer) dispatchMessages(messages []*types.Message) {
 	for _, m := range messages {
-		srv.dispatcher.DispatchMessage(m)
+		srv.apiserver.SendMessage(m)
 	}
 }

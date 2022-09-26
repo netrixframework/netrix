@@ -43,11 +43,11 @@ func NewContextFrom(sm *sm.Context, testcase *TestCase) *Context {
 }
 
 func (c *Context) CreatePartition(sizes []int, labels []string) {
-	partition, err := NewPartition(c.ReplicaStore, sizes, labels)
+	partition, err := NewPartition(sizes, labels)
 	if err != nil {
 		return
 	}
-	c.Vars.Set(partitionKey, partition)
+	partition.Setup(c)
 }
 
 // Abort stops the execution of the testcase

@@ -1,6 +1,10 @@
 package pct
 
-import "github.com/netrixframework/netrix/types"
+import (
+	"fmt"
+
+	"github.com/netrixframework/netrix/types"
+)
 
 type Message struct {
 	messageID types.MessageID
@@ -82,6 +86,15 @@ func (v *VCValue) Next(replica types.ReplicaID) *VCValue {
 	return new
 }
 
+func (v *VCValue) String() string {
+	result := "{ "
+	for r, v := range v.vals {
+		result += fmt.Sprintf("%s:%d ", r, v)
+	}
+	result += "}"
+	return result
+}
+
 type DefaultMessageOrder struct {
 	latest       *types.Map[types.ReplicaID, *VCValue]
 	sendVCValues *types.Map[types.MessageID, *VCValue]
@@ -158,7 +171,7 @@ func (eo *DefaultMessageOrder) Lt(e1, e2 types.MessageID) bool {
 	if !ok {
 		return false
 	}
-	vc2, ok := eo.sendVCValues.Get(e1)
+	vc2, ok := eo.sendVCValues.Get(e2)
 	if !ok {
 		return false
 	}

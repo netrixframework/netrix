@@ -38,5 +38,5 @@ func (d *TestCaseDriver) Step(e *types.Event) []*types.Message {
 }
 
 func (d *TestCaseDriver) setup() error {
-	return d.TestCase.setup(d.ctx)
+	return d.TestCase.Setup(d.ctx)
 }
