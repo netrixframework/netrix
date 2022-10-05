@@ -33,6 +33,7 @@ type PCTStrategy struct {
 
 var _ strategies.Strategy = &PCTStrategy{}
 
+// TODO: handle for 0 d
 func NewPCTStrategy(config *PCTStrategyConfig) *PCTStrategy {
 	var messageOrder MessageOrder = NewDefaultMessageOrder()
 	if config.MessageOrder != nil {

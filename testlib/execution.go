@@ -148,7 +148,7 @@ func (srv *TestingServer) pollEvents() {
 			continue
 		}
 		select {
-		case e := <-srv.eventCh:
+		case e := <-srv.eventCh.Ch():
 			testcaseDriver := srv.executionState.CurTestCaseDriver()
 			messages := testcaseDriver.Step(e)
 
@@ -165,7 +165,7 @@ func (srv *TestingServer) pollMessages() {
 			continue
 		}
 		select {
-		case m := <-srv.messageCh:
+		case m := <-srv.messageCh.Ch():
 			testcaseDriver := srv.executionState.CurTestCaseDriver()
 			// Gathering metrics
 			srv.ctx.ReportStore.Log(map[string]string{

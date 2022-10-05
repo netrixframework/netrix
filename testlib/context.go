@@ -43,7 +43,7 @@ func NewContextFrom(sm *sm.Context, testcase *TestCase) *Context {
 }
 
 func (c *Context) CreatePartition(sizes []int, labels []string) {
-	partition, err := NewPartition(sizes, labels)
+	partition, err := NewRandomPartition(sizes, labels)
 	if err != nil {
 		return
 	}

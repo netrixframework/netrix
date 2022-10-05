@@ -64,6 +64,7 @@ func (p *PCTStrategyWithTestCase) EndCurIteration(ctx *strategies.Context) {
 func (p *PCTStrategyWithTestCase) NextIteration(ctx *strategies.Context) {
 	p.lock.Lock()
 	p.testCaseCtx = testlib.NewContextFrom(ctx.Context, p.testCase)
+	p.testCase.StateMachine.Reset()
 	p.testCase.Setup(p.testCaseCtx)
 	p.lock.Unlock()
 

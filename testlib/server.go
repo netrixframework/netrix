@@ -12,8 +12,8 @@ import (
 type TestingServer struct {
 	apiserver *apiserver.APIServer
 	ctx       *context.RootContext
-	messageCh chan *types.Message
-	eventCh   chan *types.Event
+	messageCh *types.Channel[*types.Message]
+	eventCh   *types.Channel[*types.Event]
 
 	doneCh chan string
 

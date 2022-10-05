@@ -71,6 +71,23 @@ func DeliverMessage(m *types.Message) Action {
 	}
 }
 
+func DeliverMany(messages []*types.Message) Action {
+	return Action{
+		Name: "DeliverManyMessages",
+		Do: func(ctx *Context, a *apiserver.APIServer) error {
+			for _, message := range messages {
+				if !ctx.MessagePool.Exists(message.ID) {
+					ctx.MessagePool.Add(message.ID, message)
+				}
+				if err := a.SendMessage(message); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}
+}
+
 var doNothingAction = "_nothing"
 
 func DoNothing() Action {

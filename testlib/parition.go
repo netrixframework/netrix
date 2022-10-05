@@ -38,7 +38,7 @@ type Partition struct {
 	lock     *sync.Mutex
 }
 
-func NewPartition(sizes []int, labels []string) (*Partition, error) {
+func NewRandomPartition(sizes []int, labels []string) (*Partition, error) {
 	if len(sizes) != len(labels) {
 		return nil, ErrSizeLabelsMismatch
 	}
@@ -88,7 +88,7 @@ func (p *Partition) Setup(ctx *Context) error {
 
 	ctx.Logger.With(log.LogParams{
 		"partition": p.String(),
-	}).Debug("Created partition")
+	}).Info("Created partition")
 	ctx.Vars.Set(partitionKey, p)
 	return nil
 }

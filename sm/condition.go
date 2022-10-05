@@ -128,6 +128,17 @@ func IsMessageToF(replicaF func(*types.Event, *Context) (types.ReplicaID, bool))
 	}
 }
 
+func IsMessageBetween(one, two types.ReplicaID) Condition {
+	return func(e *types.Event, c *Context) bool {
+		message, ok := c.GetMessage(e)
+		if !ok {
+			return false
+		}
+		return (message.From == one && message.To == two) ||
+			(message.To == one && message.From == two)
+	}
+}
+
 // LtF condition that returns true if the counter value is less than the specified value.
 // The input is a function that obtains the value dynamically based on the event and context.
 func (c *CountWrapper) LtF(valF func(*types.Event, *Context) (int, bool)) Condition {
