@@ -294,8 +294,10 @@ func OnceCondition(name string, c Condition) Condition {
 	return func(e *types.Event, ctx *Context) bool {
 		key := fmt.Sprintf("%s_cond_once", name)
 		if !ctx.Vars.Exists(key) {
-			ctx.Vars.Set(key, true)
-			return c(e, ctx)
+			if c(e, ctx) {
+				ctx.Vars.Set(key, true)
+				return true
+			}
 		}
 		return false
 	}

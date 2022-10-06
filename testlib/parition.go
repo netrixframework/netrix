@@ -130,48 +130,16 @@ func (p *Partition) String() string {
 	return string(bytes)
 }
 
-// func NewPartition(replicas *types.ReplicaStore, sizes []int, labels []string) (*ReplicaPartition, error) {
-// 	partition := &ReplicaPartition{
-// 		parts: make(map[string]*part),
-// 		lock:  new(sync.Mutex),
-// 	}
-// 	sum := 0
-// 	for i, s := range sizes {
-// 		sum += s
-// 		partition.parts[labels[i]] = newPart(labels[i], sizes[i])
-// 	}
-// 	if sum > replicas.Cap() {
-// 		return nil, ErrNotEnoughReplicas
-// 	}
-
-// 	if len(sizes) != len(labels) {
-// 		return nil, ErrSizeLabelsMismatch
-// 	}
-// 	curIndex := 0
-// 	curPartSize := 0
-// 	for _, r := range replicas.Iter() {
-// 		curLabel := labels[curIndex]
-// 		curSize := sizes[curIndex]
-// 		if curPartSize < curSize {
-// 			partition.parts[curLabel].add(r.ID)
-// 			curPartSize++
-// 		} else {
-// 			curIndex++
-// 			curLabel = labels[curIndex]
-// 			partition.parts[curLabel].add(r.ID)
-// 			curPartSize = 1
-// 		}
-// 	}
-// 	return partition, nil
-// }
-
-// func (p *ReplicaPartition) InPart(replicaID types.ReplicaID, partLabel string) bool {
-// 	p.lock.Lock()
-// 	defer p.lock.Unlock()
-// 	part, ok := p.parts[partLabel]
-// 	if !ok {
-// 		return false
-// 	}
-// 	_, exists := part.replicas[replicaID]
-// 	return exists
-// }
+func IsolateNode(replica types.ReplicaID) FilterFunc {
+	return func(e *types.Event, ctx *Context) (messages []*types.Message, handled bool) {
+		message, ok := ctx.GetMessage(e)
+		if !ok {
+			return
+		}
+		if message.From == replica || message.To == replica {
+			handled = true
+			return
+		}
+		return
+	}
+}

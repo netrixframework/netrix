@@ -126,7 +126,6 @@ EventLoop:
 		if d.config.StepFunc != nil {
 			d.config.StepFunc(event, d.strategyCtx)
 		}
-		// d.Logger.Info("Stepping!")
 		action := d.strategy.Step(
 			event,
 			d.strategyCtx,

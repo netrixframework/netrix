@@ -3,6 +3,7 @@ package testlib
 import (
 	"fmt"
 
+	"github.com/netrixframework/netrix/log"
 	"github.com/netrixframework/netrix/sm"
 	"github.com/netrixframework/netrix/types"
 )
@@ -59,6 +60,10 @@ func DeliverMessage() Action {
 // DropMessage returns an empty list of messages
 func DropMessage() Action {
 	return func(e *types.Event, c *Context) []*types.Message {
+		message, ok := c.GetMessage(e)
+		if ok {
+			c.Logger.With(log.LogParams{"message": message.ParsedMessage.String()}).Debug("Dropping message")
+		}
 		return []*types.Message{}
 	}
 }
