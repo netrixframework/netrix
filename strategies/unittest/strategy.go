@@ -36,7 +36,7 @@ func (t *TestCaseStrategy) Step(e *types.Event, ctx *strategies.Context) strateg
 	if t.testCaseCtx == nil {
 		t.testCaseCtx = testlib.NewContextFrom(ctx.Context, t.testCase)
 	}
-	messages := t.testCase.Step(e, t.testCaseCtx)
+	messages, _ := t.testCase.Step(e, t.testCaseCtx)
 	if len(messages) == 0 {
 		return strategies.DoNothing()
 	}

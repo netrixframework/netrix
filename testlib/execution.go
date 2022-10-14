@@ -143,42 +143,54 @@ MainLoop:
 }
 
 func (srv *TestingServer) pollEvents() {
+EventLoop:
 	for {
-		if srv.executionState.IsBlocked() {
-			continue
-		}
 		select {
-		case e := <-srv.eventCh.Ch():
-			testcaseDriver := srv.executionState.CurTestCaseDriver()
-			messages := testcaseDriver.Step(e)
-
-			go srv.dispatchMessages(messages)
 		case <-srv.QuitCh():
 			return
+		default:
 		}
+
+		if srv.executionState.IsBlocked() {
+			continue EventLoop
+		}
+		e, ok := srv.ctx.EventQueue.Pop()
+		if !ok {
+			continue EventLoop
+		}
+		testcaseDriver := srv.executionState.CurTestCaseDriver()
+		messages := testcaseDriver.Step(e)
+
+		go srv.dispatchMessages(messages)
 	}
 }
 
 func (srv *TestingServer) pollMessages() {
+MessageLoop:
 	for {
-		if srv.executionState.IsBlocked() {
-			continue
-		}
 		select {
-		case m := <-srv.messageCh.Ch():
-			testcaseDriver := srv.executionState.CurTestCaseDriver()
-			// Gathering metrics
-			srv.ctx.ReportStore.Log(map[string]string{
-				"testcase":   testcaseDriver.TestCase.Name,
-				"type":       "message",
-				"from":       string(m.From),
-				"to":         string(m.To),
-				"message":    m.Repr,
-				"message_id": string(m.ID),
-			})
 		case <-srv.QuitCh():
 			return
+		default:
 		}
+		if srv.executionState.IsBlocked() {
+			continue MessageLoop
+		}
+
+		m, ok := srv.ctx.MessageQueue.Pop()
+		if !ok {
+			continue MessageLoop
+		}
+		testcaseDriver := srv.executionState.CurTestCaseDriver()
+		// Gathering metrics
+		srv.ctx.ReportStore.Log(map[string]string{
+			"testcase":   testcaseDriver.TestCase.Name,
+			"type":       "message",
+			"from":       string(m.From),
+			"to":         string(m.To),
+			"message":    m.Repr,
+			"message_id": string(m.ID),
+		})
 	}
 }
 

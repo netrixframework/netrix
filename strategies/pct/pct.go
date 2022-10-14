@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"sync"
 
+	"github.com/netrixframework/netrix/log"
 	"github.com/netrixframework/netrix/strategies"
 	"github.com/netrixframework/netrix/types"
 )
@@ -98,6 +99,11 @@ func (p *PCTStrategy) AddMessage(m *Message, ctx *strategies.Context) {
 		}
 	}
 	p.lock.Unlock()
+	p.Logger.With(log.LogParams{
+		"message": m.messageID,
+		"chainID": chainID,
+		"new":     new,
+	}).Debug("Added message to chain partition")
 }
 
 func (p *PCTStrategy) Schedule() (*Message, bool) {

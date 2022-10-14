@@ -12,8 +12,6 @@ import (
 type TestingServer struct {
 	apiserver *apiserver.APIServer
 	ctx       *context.RootContext
-	messageCh *types.Channel[*types.Message]
-	eventCh   *types.Channel[*types.Event]
 
 	doneCh chan string
 
@@ -31,8 +29,6 @@ func NewTestingServer(config *config.Config, messageParser types.MessageParser, 
 	server := &TestingServer{
 		apiserver:      nil,
 		ctx:            ctx,
-		messageCh:      ctx.MessageQueue.Subscribe("testingServer"),
-		eventCh:        ctx.EventQueue.Subscribe("testingServer"),
 		doneCh:         make(chan string),
 		testCases:      make(map[string]*TestCase),
 		executionState: newExecutionState(),

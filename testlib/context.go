@@ -62,14 +62,15 @@ func (c *Context) EndTestCase() {
 
 // NewMessage crafts a new message with a new ID
 // The current message contents are replaced with `data`
-func (c *Context) NewMessage(cur *types.Message, data []byte) *types.Message {
+func (c *Context) NewMessage(cur *types.Message, data []byte, pMsg types.ParsedMessage) *types.Message {
 	return &types.Message{
-		From:      cur.From,
-		To:        cur.To,
-		Data:      data,
-		Type:      cur.Type,
-		ID:        types.MessageID(fmt.Sprintf("%s_%s_change%d", cur.From, cur.To, c.counter.Next())),
-		Intercept: cur.Intercept,
+		From:          cur.From,
+		To:            cur.To,
+		Data:          data,
+		Type:          cur.Type,
+		ID:            types.MessageID(fmt.Sprintf("%s_%s_change%d", cur.From, cur.To, c.counter.Next())),
+		Intercept:     cur.Intercept,
+		ParsedMessage: pMsg,
 	}
 }
 

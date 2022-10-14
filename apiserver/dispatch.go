@@ -59,6 +59,12 @@ func (a *APIServer) SendMessage(msg *types.Message) error {
 		return nil
 	}
 
+	a.Logger.With(log.LogParams{
+		// "message": msg.ParsedMessage.String(),
+		"to": msg.To,
+		"id": msg.ID,
+	}).Debug("Sending message")
+
 	replica, ok := a.ctx.Replicas.Get(msg.To)
 	if !ok {
 		return ErrDestUnknown

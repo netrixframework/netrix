@@ -74,7 +74,7 @@ func (t *TestCase) Abort() {
 }
 
 // Step is called to execute a step of the testcase with a new event
-func (t *TestCase) Step(e *types.Event, c *Context) []*types.Message {
+func (t *TestCase) Step(e *types.Event, c *Context) ([]*types.Message, bool) {
 	return t.Cascade.handleEvent(e, c)
 }
 

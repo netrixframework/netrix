@@ -52,13 +52,13 @@ func (c *FilterSet) AddFilter(h FilterFunc) {
 }
 
 // handleEvent implements Handler
-func (c *FilterSet) handleEvent(e *types.Event, ctx *Context) []*types.Message {
+func (c *FilterSet) handleEvent(e *types.Event, ctx *Context) ([]*types.Message, bool) {
 	for _, h := range c.Filters {
 		ret, ok := h(e, ctx)
 		if ok {
-			return ret
+			return ret, true
 		}
 	}
 	ret, _ := c.DefaultFilter(e, ctx)
-	return ret
+	return ret, false
 }

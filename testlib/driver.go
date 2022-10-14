@@ -27,7 +27,7 @@ func (d *TestCaseDriver) Step(e *types.Event) []*types.Message {
 	})
 	d.ctx.EventDAG.AddNode(e, []*types.Event{})
 	d.TestCase.Logger.With(log.LogParams{"event_id": e.ID, "type": e.TypeS}).Debug("Stepping")
-	messages := d.TestCase.Step(e, d.ctx)
+	messages, _ := d.TestCase.Step(e, d.ctx)
 
 	for _, m := range messages {
 		if !d.ctx.MessagePool.Exists(m.ID) {
