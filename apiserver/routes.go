@@ -21,7 +21,7 @@ func (srv *APIServer) HandleMessage(c *gin.Context) {
 	srv.Logger.Debug("Handling message")
 	var msg types.Message
 	if err := c.ShouldBindJSON(&msg); err != nil {
-		srv.Logger.With(log.LogParams{"error": err}).Debug("Bad message")
+		srv.Logger.With(log.LogParams{"error": err}).Info("Bad message")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to unmarshal request"})
 		return
 	}
@@ -35,6 +35,13 @@ func (srv *APIServer) HandleMessage(c *gin.Context) {
 	}
 
 	msg.Parse(srv.messageParser)
+
+	srv.Logger.With(log.LogParams{
+		"message": msg.Data,
+		"type":    msg.Type,
+		"from":    msg.From,
+		"to":      msg.To,
+	}).Debug("Received message")
 
 	srv.ctx.MessageStore.Add(msg.ID, &msg)
 	srv.ctx.MessageQueue.Add(&msg)

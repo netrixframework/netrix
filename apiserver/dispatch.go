@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"github.com/netrixframework/netrix/log"
 	"github.com/netrixframework/netrix/types"
@@ -73,7 +75,18 @@ func (a *APIServer) SendMessage(msg *types.Message) error {
 	if err != nil {
 		return ErrFailedMarshal
 	}
-	_, err = a.sendReq(replica, "/message", bytes)
+	resp, err := a.sendReq(replica, "/message", bytes)
+	a.Logger.With(log.LogParams{
+		"resp": resp,
+		"to":   replica.ID,
+		"addr": replica.Addr,
+		"data": string(bytes),
+	}).Debug("Dispatched message to replica")
+	if err != nil {
+		a.Logger.With(log.LogParams{
+			"error": err,
+		}).Debug("Failed to dispatch message")
+	}
 	return err
 }
 
@@ -180,33 +193,28 @@ func (a *APIServer) sendReq(to *types.Replica, path string, msg []byte) (string,
 	if !ok {
 		// Creating a keep-alive client
 		client = &http.Client{
+			Timeout: 10 * time.Second,
 			Transport: &http.Transport{
-				MaxIdleConnsPerHost: 2,
-				MaxConnsPerHost:     1,
+				MaxIdleConnsPerHost: 1024,
 			},
 		}
 		a.clients[to.ID] = client
 	}
 	a.lock.Unlock()
 
-	req, err := http.NewRequest(http.MethodPost, "http://"+to.Addr+path, bytes.NewBuffer([]byte(msg)))
+	resp, err := client.Post("http://"+to.Addr+path, "application/json", bytes.NewBuffer([]byte(msg)))
 	if err != nil {
-		return "", ErrSendFailed
+		return "", fmt.Errorf("send failed: %s", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
+	bodyB, err := ioutil.ReadAll(resp.Body)
+	resp.Body.Close()
 
-	resp, err := client.Do(req)
 	if err != nil {
-		return "", ErrSendFailed
+		return "", fmt.Errorf("failed to read response: %s", err)
 	}
-	defer resp.Body.Close()
 	statusOK := resp.StatusCode >= 200 && resp.StatusCode < 300
 	if statusOK {
-		bodyB, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return "", ErrResponseReadFail
-		}
 		return string(bodyB), nil
 	}
-	return "", ErrBadResponse
+	return "", fmt.Errorf("bad response: %d", resp.StatusCode)
 }

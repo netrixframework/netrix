@@ -28,6 +28,15 @@ type Message struct {
 	Repr          string        `json:"repr"`
 }
 
+func GetParsedMessage[V any](m *Message) (V, bool) {
+	var result V
+	if m.ParsedMessage == nil {
+		return result, false
+	}
+	result, ok := m.ParsedMessage.(V)
+	return result, ok
+}
+
 // Clone to create a new Message object with the same attributes
 func (m *Message) Clone() Clonable {
 	return &Message{

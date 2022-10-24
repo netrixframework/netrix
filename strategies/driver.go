@@ -137,14 +137,14 @@ EventLoop:
 	}
 }
 
-func (d *Driver) performAction(action Action) error {
+func (d *Driver) performAction(action Action) {
 	if action.Name == doNothingAction {
-		return nil
+		return
 	}
 	d.Logger.With(log.LogParams{
 		"action": action.Name,
 	}).Debug("Performing action")
-	return action.Do(d.strategyCtx, d.apiserver)
+	action.Do(d.strategyCtx, d.apiserver)
 }
 
 func (d *Driver) main() error {
