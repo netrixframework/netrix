@@ -8,7 +8,7 @@
 #ifndef _GOZ3_H_INCLUDED
 #define _GOZ3_H_INCLUDED
 
-#include <z3/z3.h>
+#include "z3/z3.h"
 
 //-------------------------------------------------------------------
 // Error handling helpers
