@@ -1,6 +1,8 @@
 package testlib
 
 import (
+	"encoding/json"
+
 	"github.com/netrixframework/netrix/sm"
 	"github.com/netrixframework/netrix/types"
 )
@@ -9,12 +11,48 @@ import (
 // returns false in the second return value if the handler is not concerned about the event
 type FilterFunc func(*types.Event, *Context) ([]*types.Message, bool)
 
+type FilterSetStats struct {
+	filterCount        map[int]int
+	defaultFilterCount int
+}
+
+func (s *FilterSetStats) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.toMap())
+}
+
+func (s *FilterSetStats) String() string {
+	out, _ := json.Marshal(s.toMap())
+	return string(out)
+}
+
+func (s *FilterSetStats) toMap() map[string]interface{} {
+	data := make(map[string]interface{})
+	data["default"] = s.defaultFilterCount
+	data["filters"] = s.filterCount
+	return data
+}
+
+func (s *FilterSetStats) addCount(index int) {
+	cur, ok := s.filterCount[index]
+	if !ok {
+		s.filterCount[index] = 1
+	} else {
+		s.filterCount[index] = cur + 1
+	}
+}
+
+func (s *FilterSetStats) addDefaultCount() {
+	s.defaultFilterCount += 1
+}
+
 // FilterSet implements Handler
 // Executes handlers in the specified order until the event is handled
 // If no handler handles the event then the default handler is called
 type FilterSet struct {
 	Filters       []FilterFunc
 	DefaultFilter FilterFunc
+
+	stats *FilterSetStats
 }
 
 // FilterSetOption changes the parameters of the HandlerCascade
@@ -32,6 +70,10 @@ func NewFilterSet(opts ...FilterSetOption) *FilterSet {
 	h := &FilterSet{
 		Filters:       make([]FilterFunc, 0),
 		DefaultFilter: If(sm.IsMessageSend()).Then(DeliverMessage()),
+		stats: &FilterSetStats{
+			filterCount:        make(map[int]int),
+			defaultFilterCount: 0,
+		},
 	}
 	for _, o := range opts {
 		o(h)
@@ -51,14 +93,20 @@ func (c *FilterSet) AddFilter(h FilterFunc) {
 	c.Filters = append(c.Filters, h)
 }
 
+func (c *FilterSet) Stats() *FilterSetStats {
+	return c.stats
+}
+
 // handleEvent implements Handler
 func (c *FilterSet) handleEvent(e *types.Event, ctx *Context) ([]*types.Message, bool) {
-	for _, h := range c.Filters {
+	for i, h := range c.Filters {
 		ret, ok := h(e, ctx)
 		if ok {
+			c.stats.addCount(i + 1)
 			return ret, true
 		}
 	}
 	ret, _ := c.DefaultFilter(e, ctx)
+	c.stats.addDefaultCount()
 	return ret, false
 }

@@ -1,6 +1,9 @@
 package unittest
 
 import (
+	"encoding/json"
+	"os"
+	"path"
 	"sync"
 
 	"github.com/netrixframework/netrix/log"
@@ -14,16 +17,20 @@ type TestCaseStrategy struct {
 	testCase    *testlib.TestCase
 	testCaseCtx *testlib.Context
 
-	success int
-	lock    *sync.Mutex
+	stats          map[int]*testlib.FilterSetStats
+	recordFilePath string
+	success        int
+	lock           *sync.Mutex
 }
 
-func NewTestCaseStrategy(testCase *testlib.TestCase) *TestCaseStrategy {
+func NewTestCaseStrategy(testCase *testlib.TestCase, recordFilePath string) *TestCaseStrategy {
 	return &TestCaseStrategy{
-		BaseService: types.NewBaseService("TestCaseStrategy", nil),
-		testCase:    testCase,
-		success:     0,
-		lock:        new(sync.Mutex),
+		BaseService:    types.NewBaseService("TestCaseStrategy", nil),
+		testCase:       testCase,
+		stats:          make(map[int]*testlib.FilterSetStats),
+		recordFilePath: recordFilePath,
+		success:        0,
+		lock:           new(sync.Mutex),
 	}
 }
 
@@ -50,6 +57,7 @@ func (t *TestCaseStrategy) EndCurIteration(ctx *strategies.Context) {
 		t.success += 1
 		t.lock.Unlock()
 	}
+	t.stats[ctx.CurIteration()] = t.testCase.Cascade.Stats()
 }
 
 func (t *TestCaseStrategy) NextIteration(ctx *strategies.Context) {
@@ -67,6 +75,11 @@ func (t *TestCaseStrategy) Finalize(ctx *strategies.Context) {
 	ctx.Logger.With(log.LogParams{
 		"success": success,
 	}).Info("Total successful iterations")
+
+	statsB, err := json.Marshal(t.stats)
+	if err == nil {
+		os.WriteFile(path.Join(t.recordFilePath, "test_stats.json"), statsB, 0644)
+	}
 }
 
 func (p *TestCaseStrategy) Start() error {
