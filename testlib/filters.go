@@ -102,7 +102,7 @@ func (c *FilterSet) handleEvent(e *types.Event, ctx *Context) ([]*types.Message,
 	for i, h := range c.Filters {
 		ret, ok := h(e, ctx)
 		if ok {
-			c.stats.addCount(i + 1)
+			c.stats.addCount(i)
 			return ret, true
 		}
 	}
