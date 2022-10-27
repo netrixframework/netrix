@@ -86,3 +86,9 @@ func (t *TestCase) SetupFunc(setupFunc func(*Context) error) {
 func (t *TestCase) assert() bool {
 	return t.StateMachine.InSuccessState()
 }
+
+func (t *TestCase) Reset() {
+	t.aborted = false
+	t.once = new(sync.Once)
+	t.Cascade.resetStats()
+}

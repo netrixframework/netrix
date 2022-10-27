@@ -33,7 +33,6 @@ func (s *StrategyWithProperty) Step(e *types.Event, ctx *Context) Action {
 		s.lock.Lock()
 		s.failed += 1
 		s.lock.Unlock()
-		ctx.Abort()
 	}
 	return s.Strategy.Step(e, ctx)
 }

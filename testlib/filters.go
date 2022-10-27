@@ -45,6 +45,11 @@ func (s *FilterSetStats) addDefaultCount() {
 	s.defaultFilterCount += 1
 }
 
+func (s *FilterSetStats) reset() {
+	s.filterCount = make(map[int]int)
+	s.defaultFilterCount = 0
+}
+
 // FilterSet implements Handler
 // Executes handlers in the specified order until the event is handled
 // If no handler handles the event then the default handler is called
@@ -95,6 +100,10 @@ func (c *FilterSet) AddFilter(h FilterFunc) {
 
 func (c *FilterSet) Stats() *FilterSetStats {
 	return c.stats
+}
+
+func (c *FilterSet) resetStats() {
+	c.stats.reset()
 }
 
 // handleEvent implements Handler

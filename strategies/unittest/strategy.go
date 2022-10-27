@@ -64,6 +64,7 @@ func (t *TestCaseStrategy) NextIteration(ctx *strategies.Context) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	t.testCaseCtx = testlib.NewContextFrom(ctx.Context, t.testCase)
+	t.testCase.Reset()
 	t.testCase.StateMachine.Reset()
 	t.testCase.Setup(t.testCaseCtx)
 }
