@@ -13,20 +13,18 @@ type PCTStrategyWithTestCase struct {
 	*PCTStrategy
 	testCase    *testlib.TestCase
 	testCaseCtx *testlib.Context
-	bypass      bool
 	lock        *sync.Mutex
 }
 
-func NewPCTStrategyWithTestCase(config *PCTStrategyConfig, testCase *testlib.TestCase, bypass bool) *PCTStrategyWithTestCase {
+func NewPCTStrategyWithTestCase(config *PCTStrategyConfig, testCase *testlib.TestCase) *PCTStrategyWithTestCase {
 	return &PCTStrategyWithTestCase{
 		PCTStrategy: NewPCTStrategy(config),
 		testCase:    testCase,
-		bypass:      bypass,
 		lock:        new(sync.Mutex),
 	}
 }
 
-func (p *PCTStrategyWithTestCase) Step(e *types.Event, ctx *strategies.Context) strategies.Action {
+func (p *PCTStrategyWithTestCase) Step(e *types.Event, ctx *strategies.Context) {
 	p.lock.Lock()
 	if p.testCaseCtx == nil {
 		p.testCaseCtx = testlib.NewContextFrom(ctx.Context, p.testCase)
@@ -48,12 +46,11 @@ func (p *PCTStrategyWithTestCase) Step(e *types.Event, ctx *strategies.Context) 
 		}
 	}
 
-	if handled && p.bypass {
+	if handled {
 		if len(messages) > 0 {
-			return strategies.DeliverMany(messages)
-		} else {
-			return strategies.DoNothing()
+			p.Actions.BlockingAdd(strategies.DeliverMany(messages))
 		}
+		return
 	}
 
 	for _, m := range messages {
@@ -70,10 +67,10 @@ func (p *PCTStrategyWithTestCase) Step(e *types.Event, ctx *strategies.Context) 
 	if ok {
 		message, ok := ctx.MessagePool.Get(event.messageID)
 		if ok {
-			return strategies.DeliverMessage(message)
+			p.Actions.BlockingAdd(strategies.DeliverMessage(message))
+			return
 		}
 	}
-	return strategies.DoNothing()
 }
 
 func (p *PCTStrategyWithTestCase) EndCurIteration(ctx *strategies.Context) {

@@ -78,8 +78,8 @@ func (c *TimeoutStrategyConfig) driftMin(ctx *z3.Context) *z3.AST {
 	return one.Sub(ctx.Real(c.ClockDrift, 100)).Div(one.Add(ctx.Real(c.ClockDrift, 100)))
 }
 
-func FireTimeout(t *types.ReplicaTimeout) strategies.Action {
-	return strategies.Action{
+func FireTimeout(t *types.ReplicaTimeout) *strategies.Action {
+	return &strategies.Action{
 		Name: "FireTimeout",
 		Do: func(ctx *strategies.Context, d *apiserver.APIServer) error {
 			ctx.Logger.With(log.LogParams{
@@ -91,6 +91,7 @@ func FireTimeout(t *types.ReplicaTimeout) strategies.Action {
 }
 
 type TimeoutStrategy struct {
+	Actions         *types.Channel[*strategies.Action]
 	pendingEvents   *types.Map[string, *pendingEvent]
 	symbolMap       *types.Map[string, *z3.AST]
 	delayVals       *types.Map[string, int]
@@ -121,6 +122,7 @@ func NewTimeoutStrategy(config *TimeoutStrategyConfig) (*TimeoutStrategy, error)
 	z3context := z3.NewContext(z3config)
 
 	strategy := &TimeoutStrategy{
+		Actions:         types.NewChannel[*strategies.Action](),
 		pendingEvents:   types.NewMap[string, *pendingEvent](),
 		symbolMap:       types.NewMap[string, *z3.AST](),
 		delayVals:       types.NewMap[string, int](),
@@ -145,23 +147,27 @@ func NewTimeoutStrategy(config *TimeoutStrategyConfig) (*TimeoutStrategy, error)
 	return strategy, nil
 }
 
-func (t *TimeoutStrategy) Step(e *types.Event, ctx *strategies.Context) strategies.Action {
+func (t *TimeoutStrategy) ActionsCh() *types.Channel[*strategies.Action] {
+	return t.Actions
+}
+
+func (t *TimeoutStrategy) Step(e *types.Event, ctx *strategies.Context) {
 	if !t.Running() {
-		return strategies.DoNothing()
+		return
 	}
 	t.records.step(ctx)
 	// 1. Update constraints (add e to the graph and update the set of constraints in the solver)
 	if !t.updateConstraints(e, ctx) {
 		// Panic
 
-		return strategies.DoNothing()
+		return
 	}
 	if !t.config.Nondeterministic {
-		actions := make([]strategies.Action, 0)
 		if e.IsMessageSend() {
 			message, ok := ctx.GetMessage(e)
 			if ok {
-				actions = append(actions, strategies.DeliverMessage(message))
+				t.Actions.BlockingAdd(strategies.DeliverMessage(message))
+				return
 			}
 		} else if e.IsTimeoutStart() {
 			timeout, _ := e.Timeout()
@@ -171,14 +177,12 @@ func (t *TimeoutStrategy) Step(e *types.Event, ctx *strategies.Context) strategi
 				"replica":  timeout.Replica,
 			}).Debug("starting timeout")
 			t.normalTimer.Add(timeout)
+			return
 		}
-		for _, t := range t.normalTimer.Ready() {
-			actions = append(actions, FireTimeout(t))
+		for _, to := range t.normalTimer.Ready() {
+			t.Actions.BlockingAdd(FireTimeout(to))
 		}
-		if len(actions) == 0 {
-			return strategies.DoNothing()
-		}
-		return strategies.ActionSequence(actions...)
+		return
 	}
 
 	// 2. Update pending events
@@ -192,15 +196,14 @@ func (t *TimeoutStrategy) Step(e *types.Event, ctx *strategies.Context) strategi
 			t.Logger.With(log.LogParams{
 				"timeout": p.timeout.Key(),
 			}).Debug("firing timeout")
-			return FireTimeout(p.timeout)
+			t.Actions.BlockingAdd(FireTimeout(p.timeout))
 		} else if p.message != nil {
 			t.Logger.With(log.LogParams{
 				"message_id": p.message.ID,
 			}).Debug("delivering message")
-			return strategies.DeliverMessage(p.message)
+			t.Actions.BlockingAdd(strategies.DeliverMessage(p.message))
 		}
 	}
-	return strategies.DoNothing()
 }
 
 func (t *TimeoutStrategy) updateConstraints(e *types.Event, ctx *strategies.Context) bool {

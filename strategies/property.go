@@ -27,14 +27,14 @@ func NewStrategyWithProperty(strategy Strategy, prop *sm.StateMachine) Strategy 
 	}
 }
 
-func (s *StrategyWithProperty) Step(e *types.Event, ctx *Context) Action {
+func (s *StrategyWithProperty) Step(e *types.Event, ctx *Context) {
 	s.Property.Step(e, ctx.Context)
 	if s.Property.CurState().Is(sm.FailStateLabel) {
 		s.lock.Lock()
 		s.failed += 1
 		s.lock.Unlock()
 	}
-	return s.Strategy.Step(e, ctx)
+	s.Strategy.Step(e, ctx)
 }
 
 func (s *StrategyWithProperty) EndCurIteration(ctx *Context) {

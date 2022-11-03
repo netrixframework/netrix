@@ -15,7 +15,7 @@ import (
 
 var (
 	errStrategyQuit = errors.New("quit signalled")
-	errDriverStop   = errors.New("strategy diver signalled stop")
+	errDriverStop   = errors.New("strategy driver signalled stop")
 )
 
 // StrategyConfig store the config used for running strategies
@@ -77,15 +77,17 @@ func (d *Driver) Start() error {
 	d.StartRunning()
 	d.apiserver.Start()
 	d.ctx.Start()
-	go d.poll()
+	go d.pollEvents()
+	go d.pollActions()
 	d.strategy.Start()
 	if err := d.main(); err != nil {
+		d.Logger.With(log.LogParams{"error": err}).Debug("main loop exited")
 		if err != errDriverStop && err != errStrategyQuit {
 			return err
 		}
 		return nil
 	}
-	d.Logger.Info("completed all iterations")
+	d.Logger.Info("Completed all iterations")
 	<-d.QuitCh()
 	return nil
 }
@@ -98,7 +100,7 @@ func (d *Driver) Stop() error {
 	return nil
 }
 
-func (d *Driver) poll() {
+func (d *Driver) pollEvents() {
 	d.Logger.Info("Waiting for all replicas to connect ...")
 	d.waitForReplicas(false)
 	d.Logger.Info("All replicas connected!")
@@ -126,24 +128,48 @@ EventLoop:
 		if d.config.StepFunc != nil {
 			d.config.StepFunc(event, d.strategyCtx)
 		}
-		action := d.strategy.Step(
+		d.Logger.Debug("Stepping")
+		d.strategy.Step(
 			event,
 			d.strategyCtx,
 		)
-		if !d.canReceiveEvents() {
-			continue EventLoop
-		}
-		d.performAction(action)
 	}
 }
 
-func (d *Driver) performAction(action Action) {
+func (d *Driver) pollActions() {
+	d.waitForReplicas(false)
+
+ActionLoop:
+	for {
+		select {
+		case <-d.strategy.QuitCh():
+			return
+		case <-d.QuitCh():
+			return
+		default:
+		}
+
+		if !d.canReceiveEvents() {
+			continue ActionLoop
+		}
+
+		select {
+		case <-d.strategy.QuitCh():
+			return
+		case <-d.QuitCh():
+			return
+		case action := <-d.strategy.ActionsCh().Ch():
+			if action != nil {
+				d.performAction(action)
+			}
+		}
+	}
+}
+
+func (d *Driver) performAction(action *Action) {
 	if action.Name == doNothingAction {
 		return
 	}
-	d.Logger.With(log.LogParams{
-		"action": action.Name,
-	}).Debug("Performing action")
 	action.Do(d.strategyCtx, d.apiserver)
 }
 
@@ -195,6 +221,7 @@ func (d *Driver) main() error {
 		// d.lock.Unlock()
 
 		d.strategy.EndCurIteration(d.strategyCtx)
+		d.strategy.ActionsCh().Reset()
 		d.strategyCtx.NextIteration()
 		d.ctx.Reset()
 		d.ctx.ResumeQueues()

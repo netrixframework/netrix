@@ -59,8 +59,8 @@ type Action struct {
 	Do   func(*Context, *apiserver.APIServer) error
 }
 
-func DeliverMessage(m *types.Message) Action {
-	return Action{
+func DeliverMessage(m *types.Message) *Action {
+	return &Action{
 		Name: "DeliverMessage",
 		Do: func(ctx *Context, d *apiserver.APIServer) error {
 			if !ctx.MessagePool.Exists(m.ID) {
@@ -71,8 +71,8 @@ func DeliverMessage(m *types.Message) Action {
 	}
 }
 
-func DeliverMany(messages []*types.Message) Action {
-	return Action{
+func DeliverMany(messages []*types.Message) *Action {
+	return &Action{
 		Name: "DeliverManyMessages",
 		Do: func(ctx *Context, a *apiserver.APIServer) error {
 			for _, message := range messages {
@@ -90,8 +90,8 @@ func DeliverMany(messages []*types.Message) Action {
 
 var doNothingAction = "_nothing"
 
-func DoNothing() Action {
-	return Action{
+func DoNothing() *Action {
+	return &Action{
 		Name: doNothingAction,
 		Do: func(ctx *Context, d *apiserver.APIServer) error {
 			return nil
@@ -99,8 +99,8 @@ func DoNothing() Action {
 	}
 }
 
-func ActionSequence(actions ...Action) Action {
-	return Action{
+func ActionSequence(actions ...Action) *Action {
+	return &Action{
 		Name: "Sequence",
 		Do: func(ctx *Context, d *apiserver.APIServer) error {
 			for _, action := range actions {
@@ -116,7 +116,8 @@ func ActionSequence(actions ...Action) Action {
 
 type Strategy interface {
 	types.Service
-	Step(*types.Event, *Context) Action
+	ActionsCh() *types.Channel[*Action]
+	Step(*types.Event, *Context)
 	EndCurIteration(*Context)
 	NextIteration(*Context)
 	Finalize(*Context)

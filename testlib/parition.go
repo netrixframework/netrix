@@ -88,7 +88,7 @@ func (p *Partition) Setup(ctx *Context) error {
 
 	ctx.Logger.With(log.LogParams{
 		"partition": p.String(),
-	}).Info("Created partition")
+	}).Debug("Created partition")
 	ctx.Vars.Set(partitionKey, p)
 	return nil
 }

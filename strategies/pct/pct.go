@@ -30,6 +30,7 @@ type PCTStrategy struct {
 	chainPartition    *ChainPartition
 	lock              *sync.Mutex
 	records           *records
+	Actions           *types.Channel[*strategies.Action]
 }
 
 var _ strategies.Strategy = &PCTStrategy{}
@@ -52,6 +53,7 @@ func NewPCTStrategy(config *PCTStrategyConfig) *PCTStrategy {
 		chainPartition:    NewChainPartition(messageOrder),
 		lock:              new(sync.Mutex),
 		records:           newRecords(config.RecordFilePath),
+		Actions:           types.NewChannel[*strategies.Action](),
 	}
 	return strategy
 }
@@ -135,13 +137,13 @@ func (p *PCTStrategy) Schedule() (*Message, bool) {
 	return nil, false
 }
 
-func (p *PCTStrategy) Step(e *types.Event, ctx *strategies.Context) strategies.Action {
+func (p *PCTStrategy) Step(e *types.Event, ctx *strategies.Context) {
 
 	if e.IsMessageSend() {
 		// PCTCP addNewEvent method
 		message, ok := ctx.GetMessage(e)
 		if !ok {
-			return strategies.DoNothing()
+			return
 		}
 		p.mo.AddSendEvent(message)
 		p.AddMessage(NewMessage(message), ctx)
@@ -157,10 +159,13 @@ func (p *PCTStrategy) Step(e *types.Event, ctx *strategies.Context) strategies.A
 	if ok {
 		message, ok := ctx.MessagePool.Get(theEvent.messageID)
 		if ok {
-			return strategies.DeliverMessage(message)
+			p.Actions.BlockingAdd(strategies.DeliverMessage(message))
 		}
 	}
-	return strategies.DoNothing()
+}
+
+func (p *PCTStrategy) ActionsCh() *types.Channel[*strategies.Action] {
+	return p.Actions
 }
 
 func (p *PCTStrategy) EndCurIteration(_ *strategies.Context) {

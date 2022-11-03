@@ -14,6 +14,7 @@ import (
 
 type TestCaseStrategy struct {
 	*types.BaseService
+	Actions     *types.Channel[*strategies.Action]
 	testCase    *testlib.TestCase
 	testCaseCtx *testlib.Context
 
@@ -26,6 +27,7 @@ type TestCaseStrategy struct {
 func NewTestCaseStrategy(testCase *testlib.TestCase, recordFilePath string) *TestCaseStrategy {
 	return &TestCaseStrategy{
 		BaseService:    types.NewBaseService("TestCaseStrategy", nil),
+		Actions:        types.NewChannel[*strategies.Action](),
 		testCase:       testCase,
 		stats:          make(map[int]*testlib.FilterSetStats),
 		recordFilePath: recordFilePath,
@@ -36,7 +38,7 @@ func NewTestCaseStrategy(testCase *testlib.TestCase, recordFilePath string) *Tes
 
 var _ strategies.Strategy = &TestCaseStrategy{}
 
-func (t *TestCaseStrategy) Step(e *types.Event, ctx *strategies.Context) strategies.Action {
+func (t *TestCaseStrategy) Step(e *types.Event, ctx *strategies.Context) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -45,10 +47,13 @@ func (t *TestCaseStrategy) Step(e *types.Event, ctx *strategies.Context) strateg
 	}
 	messages, _ := t.testCase.Step(e, t.testCaseCtx)
 	if len(messages) == 0 {
-		return strategies.DoNothing()
+		return
 	}
+	t.Actions.BlockingAdd(strategies.DeliverMany(messages))
+}
 
-	return strategies.DeliverMany(messages)
+func (t *TestCaseStrategy) ActionsCh() *types.Channel[*strategies.Action] {
+	return t.Actions
 }
 
 func (t *TestCaseStrategy) EndCurIteration(ctx *strategies.Context) {

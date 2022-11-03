@@ -61,7 +61,7 @@ func (q *Queue[V]) dispatchLoop() {
 						select {
 						case <-q.QuitCh():
 						default:
-							subs.Add(toAdd.Clone().(V))
+							subs.BlockingAdd(toAdd.Clone().(V))
 						}
 						q.dispatchWG.Done()
 					}(s)
@@ -176,7 +176,7 @@ type Channel[V any] struct {
 
 func NewChannel[V any]() *Channel[V] {
 	return &Channel[V]{
-		curChan: make(chan V, 10),
+		curChan: make(chan V, 20),
 		open:    true,
 		lock:    new(sync.Mutex),
 	}
@@ -186,9 +186,15 @@ func (c *Channel[V]) Open() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if !c.open {
-		c.curChan = make(chan V, 10)
+		c.curChan = make(chan V, 20)
 		c.open = true
 	}
+}
+
+func (c *Channel[V]) IsOpen() bool {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	return c.open
 }
 
 func (c *Channel[V]) Close() {
@@ -206,20 +212,30 @@ func (c *Channel[V]) Ch() chan V {
 	return c.curChan
 }
 
-func (c *Channel[V]) Add(element V) {
+func (c *Channel[V]) NonBlockingAdd(element V) bool {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if c.open {
+		if len(c.curChan) == cap(c.curChan) {
+			return false
+		}
 		c.curChan <- element
+	}
+	return true
+}
+
+func (c *Channel[V]) BlockingAdd(element V) {
+	for !c.NonBlockingAdd(element) {
 	}
 }
 
 func (c *Channel[V]) Reset() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-
-	close(c.curChan)
-	c.curChan = make(chan V, 10)
+	if c.open {
+		close(c.curChan)
+	}
+	c.curChan = make(chan V, 20)
 	c.open = true
 }
 

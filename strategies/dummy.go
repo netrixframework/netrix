@@ -7,6 +7,7 @@ import (
 
 type DummyStrategy struct {
 	*types.BaseService
+	Actions *types.Channel[*Action]
 }
 
 var _ Strategy = &DummyStrategy{}
@@ -14,7 +15,12 @@ var _ Strategy = &DummyStrategy{}
 func NewDummyStrategy() *DummyStrategy {
 	return &DummyStrategy{
 		BaseService: types.NewBaseService("dummyStrategy", nil),
+		Actions:     types.NewChannel[*Action](),
 	}
+}
+
+func (d *DummyStrategy) ActionsCh() *types.Channel[*Action] {
+	return d.Actions
 }
 
 func (d *DummyStrategy) Start() error {
@@ -27,9 +33,9 @@ func (d *DummyStrategy) Stop() error {
 	return nil
 }
 
-func (d *DummyStrategy) Step(event *types.Event, c *Context) Action {
+func (d *DummyStrategy) Step(event *types.Event, c *Context) {
 	if !event.IsMessageSend() {
-		return DoNothing()
+		return
 	}
 	messageID, _ := event.MessageID()
 	message, ok := c.MessagePool.Get(messageID)
@@ -39,9 +45,8 @@ func (d *DummyStrategy) Step(event *types.Event, c *Context) Action {
 			"from":       message.From,
 			"to":         message.To,
 		}).Debug("Delivering message")
-		return DeliverMessage(message)
+		d.Actions.BlockingAdd(DeliverMessage(message))
 	}
-	return DoNothing()
 }
 
 func (f *DummyStrategy) EndCurIteration(*Context) {
