@@ -99,7 +99,7 @@ MainLoop:
 		testcaseLogger.Debug("Waiting for completion")
 		srv.executionState.Unblock()
 		select {
-		case <-testcase.doneCh:
+		case <-testcase.doneCh.Ch():
 		case <-time.After(testcase.Timeout):
 			testcaseLogger.Info("Testcase timedout")
 		case <-srv.QuitCh():

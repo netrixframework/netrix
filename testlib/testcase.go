@@ -26,7 +26,7 @@ type TestCase struct {
 	// Logger to log information
 	Logger *log.Logger
 
-	doneCh chan string
+	doneCh *types.Channel[bool]
 	once   *sync.Once
 }
 
@@ -53,7 +53,7 @@ func NewTestCase(name string, timeout time.Duration, sm *sm.StateMachine, cascad
 		Setup:        defaultSetupFunc,
 		assertFn:     defaultAssertFunc,
 		aborted:      false,
-		doneCh:       make(chan string, 1),
+		doneCh:       types.NewChannel[bool](),
 		once:         new(sync.Once),
 	}
 }
@@ -61,7 +61,7 @@ func NewTestCase(name string, timeout time.Duration, sm *sm.StateMachine, cascad
 // End the testcase
 func (t *TestCase) End() {
 	t.once.Do(func() {
-		close(t.doneCh)
+		t.doneCh.Close()
 	})
 }
 
@@ -69,7 +69,7 @@ func (t *TestCase) End() {
 func (t *TestCase) Abort() {
 	t.aborted = true
 	t.once.Do(func() {
-		close(t.doneCh)
+		t.doneCh.Close()
 	})
 }
 
@@ -90,5 +90,6 @@ func (t *TestCase) assert() bool {
 func (t *TestCase) Reset() {
 	t.aborted = false
 	t.once = new(sync.Once)
+	t.doneCh.Reset()
 	t.Cascade.resetStats()
 }
