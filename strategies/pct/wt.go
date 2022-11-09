@@ -33,17 +33,16 @@ func (p *PCTStrategyWithTestCase) Step(e *types.Event, ctx *strategies.Context) 
 	p.lock.Unlock()
 
 	for _, m := range messages {
-		p.mo.AddSendEvent(m)
 		if !ctx.MessagePool.Exists(m.ID) {
 			ctx.MessagePool.Add(m.ID, m)
 		}
 	}
 
-	if e.IsMessageReceive() {
-		message, ok := ctx.GetMessage(e)
-		if ok {
-			p.mo.AddRecvEvent(message)
-		}
+	message, ok := ctx.GetMessage(e)
+	if e.IsMessageSend() && ok {
+		p.mo.AddSendEvent(message)
+	} else if e.IsMessageReceive() && ok {
+		p.mo.AddRecvEvent(message)
 	}
 
 	if handled {

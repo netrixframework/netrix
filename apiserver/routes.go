@@ -34,13 +34,19 @@ func (srv *APIServer) HandleMessage(c *gin.Context) {
 		return
 	}
 
-	msg.Parse(srv.messageParser)
+	err := msg.Parse(srv.messageParser)
 	srv.Logger.With(log.LogParams{
 		"message": msg.Data,
 		"type":    msg.Type,
 		"from":    msg.From,
 		"to":      msg.To,
+		"id":      msg.ID,
 	}).Debug("Received message")
+	if err == nil {
+		srv.Logger.With(log.LogParams{
+			"parsed_message": msg.ParsedMessage.String(),
+		}).Debug("Parsed message")
+	}
 
 	srv.ctx.MessageStore.Add(msg.ID, &msg)
 	srv.ctx.MessageQueue.Add(&msg)
@@ -93,11 +99,6 @@ func (srv *APIServer) HandleEvent(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 		return
 	}
-	srv.Logger.With(log.LogParams{
-		"replica": e.Replica,
-		"type":    e.TypeS,
-		"params":  e.Params,
-	}).Debug("Received event")
 
 	var eventType types.EventType
 	switch e.TypeS {
@@ -124,14 +125,21 @@ func (srv *APIServer) HandleEvent(c *gin.Context) {
 	default:
 		eventType = types.NewGenericEventType(e.Params, e.TypeS)
 	}
-
-	srv.ctx.EventQueue.Add(types.NewEvent(
+	event := types.NewEvent(
 		e.Replica,
 		eventType,
 		eventType.String(),
 		types.EventID((srv.gen.Next())),
 		e.Timestamp,
-	))
+	)
+
+	srv.Logger.With(log.LogParams{
+		"replica": e.Replica,
+		"type":    e.TypeS,
+		"params":  e.Params,
+		"id":      event.ID,
+	}).Debug("Received event")
+	srv.ctx.EventQueue.Add(event)
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 

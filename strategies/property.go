@@ -54,14 +54,12 @@ func (s *StrategyWithProperty) NextIteration(ctx *Context) {
 	s.Property.Reset()
 	s.Strategy.NextIteration(ctx)
 
-	if ctx.CurIteration()%100 == 0 {
-		s.lock.Lock()
-		ctx.Logger.With(log.LogParams{
-			"success": s.success,
-			"failed":  s.failed,
-		}).Info("Current outcomes")
-		s.lock.Unlock()
-	}
+	s.lock.Lock()
+	ctx.Logger.With(log.LogParams{
+		"success": s.success,
+		"failed":  s.failed,
+	}).Info("Current outcomes")
+	s.lock.Unlock()
 }
 
 func (s *StrategyWithProperty) Finalize(ctx *Context) {

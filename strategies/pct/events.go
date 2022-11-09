@@ -133,7 +133,7 @@ func (eo *DefaultMessageOrder) AddRecvEvent(e *types.Message) {
 		return
 	}
 
-	sendVCValue, _ := eo.sendVCValues.Get(e.ID)
+	sendVCValue, sendExists := eo.sendVCValues.Get(e.ID)
 
 	cur, ok := eo.latest.Get(e.To)
 	if !ok {
@@ -144,21 +144,27 @@ func (eo *DefaultMessageOrder) AddRecvEvent(e *types.Message) {
 
 	recvVCValue := &VCValue{vals: make(map[types.ReplicaID]int)}
 	replicas := make(map[types.ReplicaID]bool)
-	for replica := range sendVCValue.vals {
-		replicas[replica] = true
-	}
-	for replica := range cur.vals {
-		replicas[replica] = true
-	}
-	for r := range replicas {
-		v1, ok1 := sendVCValue.vals[r]
-		v2, ok2 := cur.vals[r]
-		if !ok1 && ok2 {
-			recvVCValue.vals[r] = v2
-		} else if !ok2 && ok1 {
-			recvVCValue.vals[r] = v1
-		} else if ok1 && ok2 {
-			recvVCValue.vals[r] = types.Max(v1, v2)
+	if sendExists {
+		for replica := range sendVCValue.vals {
+			replicas[replica] = true
+		}
+		for replica := range cur.vals {
+			replicas[replica] = true
+		}
+		for r := range replicas {
+			v1, ok1 := sendVCValue.vals[r]
+			v2, ok2 := cur.vals[r]
+			if !ok1 && ok2 {
+				recvVCValue.vals[r] = v2
+			} else if !ok2 && ok1 {
+				recvVCValue.vals[r] = v1
+			} else if ok1 && ok2 {
+				recvVCValue.vals[r] = types.Max(v1, v2)
+			}
+		}
+	} else {
+		for replica, val := range cur.vals {
+			recvVCValue.vals[replica] = val
 		}
 	}
 
