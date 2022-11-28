@@ -170,6 +170,7 @@ func (d *Driver) performAction(action *Action) {
 	if action.Name == doNothingAction {
 		return
 	}
+	d.strategyCtx.ActionSequence.Append(action)
 	action.Do(d.strategyCtx, d.apiserver)
 }
 

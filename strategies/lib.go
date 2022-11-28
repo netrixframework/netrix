@@ -12,19 +12,21 @@ import (
 
 type Context struct {
 	*sm.Context
-	curIteration int
-	abortCh      chan struct{}
-	once         *sync.Once
-	lock         *sync.Mutex
+	ActionSequence *types.List[*Action]
+	curIteration   int
+	abortCh        chan struct{}
+	once           *sync.Once
+	lock           *sync.Mutex
 }
 
 func newContext(ctx *context.RootContext) *Context {
 	return &Context{
-		Context:      sm.NewContext(ctx, ctx.Logger),
-		curIteration: 0,
-		abortCh:      make(chan struct{}),
-		once:         new(sync.Once),
-		lock:         new(sync.Mutex),
+		Context:        sm.NewContext(ctx, ctx.Logger),
+		ActionSequence: types.NewEmptyList[*Action](),
+		curIteration:   0,
+		abortCh:        make(chan struct{}),
+		once:           new(sync.Once),
+		lock:           new(sync.Mutex),
 	}
 }
 
@@ -36,12 +38,13 @@ func (c *Context) CurIteration() int {
 }
 
 func (c *Context) NextIteration() {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	c.curIteration++
+	c.ActionSequence.RemoveAll()
 	c.EventDAG.Reset()
 	c.Vars.Reset()
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.curIteration++
 }
 
 func (c *Context) AbortCh() <-chan struct{} {
@@ -61,7 +64,7 @@ type Action struct {
 
 func DeliverMessage(m *types.Message) *Action {
 	return &Action{
-		Name: "DeliverMessage",
+		Name: "DeliverMessage_" + string(m.ID),
 		Do: func(ctx *Context, d *apiserver.APIServer) error {
 			if !ctx.MessagePool.Exists(m.ID) {
 				ctx.MessagePool.Add(m.ID, m)
