@@ -184,7 +184,7 @@ func (l *List[V]) Elem(index int) (V, bool) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	var res V
-	if index < 0 || index > l.size {
+	if index < 0 || index >= l.size {
 		return res, false
 	}
 	return l.elems[index], true

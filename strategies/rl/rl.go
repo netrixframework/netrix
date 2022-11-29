@@ -59,9 +59,11 @@ func (r *RLStrategy) Step(e *types.Event, ctx *strategies.Context) {
 			r.saMap.Update(state.Hash(), a.Name, 0)
 		}
 	}
-	action, ok := r.policy.NextAction(r.saMap, state, actions)
-	if ok {
-		r.actions.BlockingAdd(action)
+	if len(actions) > 0 {
+		action, ok := r.policy.NextAction(r.saMap, state, actions)
+		if ok {
+			r.actions.BlockingAdd(action)
+		}
 	}
 }
 
