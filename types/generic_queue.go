@@ -13,6 +13,7 @@ type Clonable interface {
 	Clone() Clonable
 }
 
+// Queue is a generic pub-sub queue that is thread safe
 type Queue[V Clonable] struct {
 	vals        []V
 	subscribers map[string]*Channel[V]
@@ -83,7 +84,7 @@ func (q *Queue[V]) dispatchLoop() {
 	}
 }
 
-// Stop implements Service
+// Stop implements [Service]
 func (q *Queue[V]) Stop() error {
 	q.StopRunning()
 	q.dispatchWG.Wait()
@@ -168,12 +169,36 @@ func (q *Queue[V]) Subscribe(label string) *Channel[V] {
 	return newChan
 }
 
+// Channel[V] is a synchronized channel that can be reset (closed and opened) multiple times.
+/*
+The data structure is useful when we need to close the channel and re-open a new one in a multi threaded
+environment. The underlying channel is encapsulated with a Mutex lock.
+
+Example:
+	ch := NewChannel[int]
+
+	go func() {
+		for {
+			select {
+			case <-ch.Ch():
+				//...
+			}
+		}
+	}()
+
+	ch.BlockingAdd(1)
+	ch.BlockingAdd(2)
+	ch.Close()
+	ch.Open()
+	//...
+*/
 type Channel[V any] struct {
 	curChan chan V
 	open    bool
 	lock    *sync.Mutex
 }
 
+// NewChannel[V] creates a Channel[V] object.
 func NewChannel[V any]() *Channel[V] {
 	return &Channel[V]{
 		curChan: make(chan V, 20),
@@ -182,6 +207,7 @@ func NewChannel[V any]() *Channel[V] {
 	}
 }
 
+// Open clears the previous channel and unlocks it
 func (c *Channel[V]) Open() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -191,12 +217,14 @@ func (c *Channel[V]) Open() {
 	}
 }
 
+// IsOpen returns true if the channel is open
 func (c *Channel[V]) IsOpen() bool {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	return c.open
 }
 
+// Close closes the channel
 func (c *Channel[V]) Close() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -206,12 +234,15 @@ func (c *Channel[V]) Close() {
 	}
 }
 
+// Ch returns the underlying channel that can be used to poll
 func (c *Channel[V]) Ch() chan V {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	return c.curChan
 }
 
+// NonBlockingAdd adds the element if the underlying channel is not full,
+// results in a no-op otherwise.
 func (c *Channel[V]) NonBlockingAdd(element V) bool {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -224,11 +255,13 @@ func (c *Channel[V]) NonBlockingAdd(element V) bool {
 	return true
 }
 
+// BlockingAdd waits until the channel is not full to add.
 func (c *Channel[V]) BlockingAdd(element V) {
 	for !c.NonBlockingAdd(element) {
 	}
 }
 
+// Reset closes the underlying channel and creates a new one.
 func (c *Channel[V]) Reset() {
 	c.lock.Lock()
 	defer c.lock.Unlock()

@@ -9,6 +9,9 @@ import (
 	"github.com/netrixframework/netrix/types"
 )
 
+// PCTStrategyWithTestCase encapsulates PCTStrategy with a testcase
+// For each event, we invoke the filters of the testcase and when none of the filter
+// conditions are satisfied, the event is passed to PCTStrategy.
 type PCTStrategyWithTestCase struct {
 	*PCTStrategy
 	testCase    *testlib.TestCase
@@ -16,6 +19,7 @@ type PCTStrategyWithTestCase struct {
 	lock        *sync.Mutex
 }
 
+// NewPCTStrategyWithTestCase creates a new PCTStrategyWithTestCase
 func NewPCTStrategyWithTestCase(config *PCTStrategyConfig, testCase *testlib.TestCase) *PCTStrategyWithTestCase {
 	return &PCTStrategyWithTestCase{
 		PCTStrategy: NewPCTStrategy(config),
@@ -59,7 +63,7 @@ func (p *PCTStrategyWithTestCase) Step(e *types.Event, ctx *strategies.Context) 
 			"to":   m.To,
 			"id":   m.ID,
 		}).Debug("Adding message to PCT")
-		p.AddMessage(NewMessage(m), ctx)
+		p.AddMessage(newPCTMessage(m), ctx)
 	}
 
 	event, ok := p.Schedule()

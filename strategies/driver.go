@@ -32,6 +32,7 @@ type StrategyConfig struct {
 	FinalizeFunc func(*Context)
 }
 
+// Driver runs the strategy with the specified configuration
 type Driver struct {
 	strategy  Strategy
 	apiserver *apiserver.APIServer
@@ -47,6 +48,7 @@ type Driver struct {
 	*types.BaseService
 }
 
+// NewStrategyDriver creates a strategy and initializes the APIServer
 func NewStrategyDriver(
 	config *config.Config,
 	mp types.MessageParser,
@@ -73,6 +75,7 @@ func NewStrategyDriver(
 	return d
 }
 
+// Start the driver and in turn start running the iterations
 func (d *Driver) Start() error {
 	d.StartRunning()
 	d.apiserver.Start()
@@ -92,6 +95,7 @@ func (d *Driver) Start() error {
 	return nil
 }
 
+// Stop running the driver
 func (d *Driver) Stop() error {
 	d.StopRunning()
 	d.apiserver.Stop()
@@ -203,7 +207,7 @@ func (d *Driver) main() error {
 				d.config.FinalizeFunc(d.strategyCtx)
 			}
 			return errDriverStop
-		case <-d.strategyCtx.AbortCh():
+		case <-d.strategyCtx.abortCh:
 		case <-time.After(d.config.IterationTimeout):
 		}
 		d.blockEvents()
@@ -223,7 +227,7 @@ func (d *Driver) main() error {
 
 		d.strategy.EndCurIteration(d.strategyCtx)
 		d.strategy.ActionsCh().Reset()
-		d.strategyCtx.NextIteration()
+		d.strategyCtx.nextIteration()
 		d.ctx.Reset()
 		d.ctx.ResumeQueues()
 

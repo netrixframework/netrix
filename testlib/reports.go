@@ -25,7 +25,7 @@ type reportStore struct {
 	lock *sync.Mutex
 }
 
-func NewReportStore() *reportStore {
+func newReportStore() *reportStore {
 	return &reportStore{
 		logs: make([]*reportLog, 0),
 		size: 0,

@@ -6,9 +6,9 @@ import (
 	"github.com/netrixframework/netrix/types"
 )
 
-type Chain struct {
+type chain struct {
 	ID     int
-	events []*Message
+	events []*pctMessage
 	lock   *sync.Mutex
 
 	enabled           bool
@@ -16,10 +16,10 @@ type Chain struct {
 	size              int
 }
 
-func NewChain(id int, event *Message) *Chain {
-	chain := &Chain{
+func newChain(id int, event *pctMessage) *chain {
+	chain := &chain{
 		ID:                id,
-		events:            make([]*Message, 0),
+		events:            make([]*pctMessage, 0),
 		lock:              new(sync.Mutex),
 		enabled:           true,
 		enabledEventIndex: 0,
@@ -29,13 +29,13 @@ func NewChain(id int, event *Message) *Chain {
 	return chain
 }
 
-func (c *Chain) LastEvent() *Message {
+func (c *chain) LastEvent() *pctMessage {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	return c.events[c.size-1]
 }
 
-func (c *Chain) AddEvent(e *Message) {
+func (c *chain) AddEvent(e *pctMessage) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -47,14 +47,14 @@ func (c *Chain) AddEvent(e *Message) {
 	}
 }
 
-func (c *Chain) IsEnabled() bool {
+func (c *chain) IsEnabled() bool {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	return c.enabled
 }
 
-func (c *Chain) EnabledEvent() (*Message, bool) {
+func (c *chain) EnabledEvent() (*pctMessage, bool) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if !c.enabled {
@@ -63,7 +63,7 @@ func (c *Chain) EnabledEvent() (*Message, bool) {
 	return c.events[c.enabledEventIndex], true
 }
 
-func (c *Chain) IncrEnabledEvent() {
+func (c *chain) IncrEnabledEvent() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -75,16 +75,16 @@ func (c *Chain) IncrEnabledEvent() {
 	}
 }
 
-type ChainPartition struct {
-	Chains     *types.Map[int, *Chain]
+type chainPartition struct {
+	Chains     *types.Map[int, *chain]
 	Partitions []*types.Set[int]
 	mo         MessageOrder
 	lock       *sync.Mutex
 }
 
-func NewChainPartition(mo MessageOrder) *ChainPartition {
-	return &ChainPartition{
-		Chains:     types.NewMap[int, *Chain](),
+func newChainPartition(mo MessageOrder) *chainPartition {
+	return &chainPartition{
+		Chains:     types.NewMap[int, *chain](),
 		Partitions: make([]*types.Set[int], 0),
 		lock:       new(sync.Mutex),
 		mo:         mo,
@@ -93,7 +93,7 @@ func NewChainPartition(mo MessageOrder) *ChainPartition {
 
 // AddEvent adds the event to the chain partition
 // Returns the chain ID and a boolean indicating if the chain is newly created
-func (p *ChainPartition) AddEvent(e *Message) (int, bool) {
+func (p *chainPartition) AddEvent(e *pctMessage) (int, bool) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -102,7 +102,7 @@ func (p *ChainPartition) AddEvent(e *Message) (int, bool) {
 	addedPartition := -1
 
 	for i, partition := range p.Partitions {
-		var compatibleChain *Chain = nil
+		var compatibleChain *chain = nil
 		for _, chainID := range partition.Iter() {
 			chain, _ := p.Chains.Get(chainID)
 			last := chain.LastEvent()
@@ -119,7 +119,7 @@ func (p *ChainPartition) AddEvent(e *Message) (int, bool) {
 			addedPartition = i
 			break
 		} else if partition.Size() < i+1 {
-			newChain := NewChain(p.Chains.Size(), e)
+			newChain := newChain(p.Chains.Size(), e)
 			p.Chains.Add(newChain.ID, newChain)
 			partition.Add(newChain.ID)
 			addedChainID = newChain.ID
@@ -134,7 +134,7 @@ func (p *ChainPartition) AddEvent(e *Message) (int, bool) {
 		newPartition := types.NewSet[int]()
 		p.Partitions = append(p.Partitions, newPartition)
 
-		newChain := NewChain(p.Chains.Size(), e)
+		newChain := newChain(p.Chains.Size(), e)
 		p.Chains.Add(newChain.ID, newChain)
 		newPartition.Add(newChain.ID)
 
@@ -156,7 +156,7 @@ func (p *ChainPartition) AddEvent(e *Message) (int, bool) {
 	return addedChainID, newChainCreated
 }
 
-func (p *ChainPartition) EnabledChains() []int {
+func (p *chainPartition) EnabledChains() []int {
 	result := make([]int, 0)
 	for chainID, chain := range p.Chains.ToMap() {
 		if chain.IsEnabled() {
@@ -167,7 +167,7 @@ func (p *ChainPartition) EnabledChains() []int {
 	return result
 }
 
-func (p *ChainPartition) GetEnabledEvent(chainID int) (*Message, bool) {
+func (p *chainPartition) GetEnabledEvent(chainID int) (*pctMessage, bool) {
 	chain, ok := p.Chains.Get(chainID)
 	if !ok {
 		return nil, false
@@ -176,14 +176,14 @@ func (p *ChainPartition) GetEnabledEvent(chainID int) (*Message, bool) {
 	return chain.EnabledEvent()
 }
 
-func (p *ChainPartition) MarkScheduled(chainID int) {
+func (p *chainPartition) MarkScheduled(chainID int) {
 	chain, ok := p.Chains.Get(chainID)
 	if ok {
 		chain.IncrEnabledEvent()
 	}
 }
 
-func (p *ChainPartition) Reset() {
+func (p *chainPartition) Reset() {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 

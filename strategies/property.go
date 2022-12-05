@@ -8,6 +8,8 @@ import (
 	"github.com/netrixframework/netrix/types"
 )
 
+// StrategyWithProperty encapsulates a strategy with a property
+// The property is specified as a state machine
 type StrategyWithProperty struct {
 	Strategy
 	Property *sm.StateMachine
@@ -17,6 +19,7 @@ type StrategyWithProperty struct {
 	lock    *sync.Mutex
 }
 
+// Creates a new [StrategyWithProperty]
 func NewStrategyWithProperty(strategy Strategy, prop *sm.StateMachine) Strategy {
 	return &StrategyWithProperty{
 		Strategy: strategy,

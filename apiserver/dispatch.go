@@ -47,6 +47,8 @@ type directiveMessage struct {
 	Action string `json:"action"`
 }
 
+// SendMessage should be invoked to send the message to the intended replica.
+// The MessageID is cached and subsequent invocations for the same message will result in a no-op
 func (a *APIServer) SendMessage(msg *types.Message) error {
 	a.lock.Lock()
 	_, ok := a.dispatchedMessages[msg.ID]
@@ -90,14 +92,15 @@ func (a *APIServer) SendMessage(msg *types.Message) error {
 	return err
 }
 
+// ForgetSendMessages clears the delivered message cache.
 func (a *APIServer) ForgetSentMessages() {
 	a.lock.Lock()
 	a.dispatchedMessages = make(map[types.MessageID]bool)
 	a.lock.Unlock()
 }
 
-// Send a timeout message to the replica
-// This is the equivalent of ending a timeout at the replica
+// SendTimeout sends a timeout message to the replica.
+// This is the equivalent of ending a timeout at the replica.
 func (d *APIServer) SendTimeout(t *types.ReplicaTimeout) error {
 	d.Logger.With(log.LogParams{
 		"timeout_type": t.Type,
@@ -118,7 +121,7 @@ func (d *APIServer) SendTimeout(t *types.ReplicaTimeout) error {
 	return nil
 }
 
-// StopReplica should be called to direct the replica to stop running
+// StopReplica sends the Stop directive to the replica
 func (d *APIServer) StopReplica(replica types.ReplicaID) error {
 	replicaS, ok := d.ctx.Replicas.Get(replica)
 	if !ok {
@@ -127,7 +130,7 @@ func (d *APIServer) StopReplica(replica types.ReplicaID) error {
 	return d.sendDirective(stopAction, replicaS)
 }
 
-// StartReplica should be called to direct the replica to start running
+// StartReplica sends the Start directive to the replica
 func (d *APIServer) StartReplica(replica types.ReplicaID) error {
 	replicaS, ok := d.ctx.Replicas.Get(replica)
 	if !ok {
@@ -136,7 +139,7 @@ func (d *APIServer) StartReplica(replica types.ReplicaID) error {
 	return d.sendDirective(startAction, replicaS)
 }
 
-// RestartReplica should be called to direct the replica to restart
+// RestartReplica sends the Restart directive to the replica
 func (d *APIServer) RestartReplica(replica types.ReplicaID) error {
 	replicaS, ok := d.ctx.Replicas.Get(replica)
 	if !ok {
@@ -148,7 +151,7 @@ func (d *APIServer) RestartReplica(replica types.ReplicaID) error {
 	return d.sendDirective(restartAction, replicaS)
 }
 
-// RestartAll restarts all the replicas
+// RestartAll sends a Restart directive to all replicas
 func (d *APIServer) RestartAll() error {
 	errCh := make(chan error, d.ctx.Replicas.Cap())
 	for _, r := range d.ctx.Replicas.Iter() {

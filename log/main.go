@@ -1,3 +1,7 @@
+// Package log defines the log interface for logging data.
+//
+// Instances of [Logger] is used throughout the framework to log information, errors and debug messages.
+// The package also instantiates [DefaultLogger] that can be used to log impromptu within the framework.
 package log
 
 import (
@@ -51,17 +55,17 @@ func Fatal(s string) {
 	DefaultLogger.Fatal(s)
 }
 
-// Info logs a message with level `info`with the default logger
+// Info logs a message with level `info` with the default logger
 func Info(s string) {
 	DefaultLogger.Info(s)
 }
 
-// Warn logs a message with level `warning`with the default logger
+// Warn logs a message with level `warning` with the default logger
 func Warn(s string) {
 	DefaultLogger.Warn(s)
 }
 
-// Errors logs a message with level `error`with the default logger
+// Errors logs a message with level `error` with the default logger
 func Error(s string) {
 	DefaultLogger.Error(s)
 }

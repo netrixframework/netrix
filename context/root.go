@@ -1,3 +1,4 @@
+// Package context defines the global context object used by Netrix.
 package context
 
 import (
@@ -61,11 +62,13 @@ func (c *RootContext) Reset() {
 	c.MessageStore.RemoveAll()
 }
 
+// PauseQueues invokes [types.Queue.Pause] on the message and event queues
 func (c *RootContext) PauseQueues() {
 	c.MessageQueue.Pause()
 	c.EventQueue.Pause()
 }
 
+// ResumeQueues invokes [types.Queue.Resume] on the message and event queues
 func (c *RootContext) ResumeQueues() {
 	c.MessageQueue.Resume()
 	c.EventQueue.Resume()

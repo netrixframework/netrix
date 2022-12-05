@@ -11,6 +11,8 @@ import (
 // returns false in the second return value if the handler is not concerned about the event
 type FilterFunc func(*types.Event, *Context) ([]*types.Message, bool)
 
+// FilterSetStats keeps a count of the number of times a filter condition was satisfied for a given filter
+// The filter index is the order in which the filter is specified.
 type FilterSetStats struct {
 	filterCount        map[int]int
 	defaultFilterCount int
@@ -98,6 +100,7 @@ func (c *FilterSet) AddFilter(h FilterFunc) {
 	c.Filters = append(c.Filters, h)
 }
 
+// Stats returns the stats
 func (c *FilterSet) Stats() *FilterSetStats {
 	return c.stats
 }

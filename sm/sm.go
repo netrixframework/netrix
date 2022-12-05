@@ -1,3 +1,7 @@
+// Package sm defines the state machine used to specify properties to test for.
+//
+// The package also defines a builder interface that can be used to construct
+// the state machine in an intuitive manner.
 package sm
 
 import (
@@ -61,6 +65,7 @@ func (s *State) Eq(other *State) bool {
 	return s.Label == other.Label
 }
 
+// For serializing the
 func (s *State) MarshalJSON() ([]byte, error) {
 	keyvals := make(map[string]interface{})
 	keyvals["label"] = s.Label
@@ -192,6 +197,7 @@ func (s *StateMachine) newState(label string) *State {
 	return newState
 }
 
+// Step runs the next step of the state machine for the current event.
 func (s *StateMachine) Step(e *types.Event, c *Context) {
 	state := s.run.CurState()
 	for _, to := range state.transitionOrder {

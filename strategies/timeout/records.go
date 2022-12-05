@@ -108,7 +108,6 @@ func (r *records) summarize(ctx *strategies.Context) {
 		choices.Save(r.filePath)
 	}
 	distVals := r.distributionValues
-	// TODO: Need to summarize the the metrics
 	r.lock.Unlock()
 	saveDistValues(r.filePath, distVals)
 	ctx.Logger.With(log.LogParams{

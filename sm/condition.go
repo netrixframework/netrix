@@ -6,6 +6,7 @@ import (
 	"github.com/netrixframework/netrix/types"
 )
 
+// Condition a generic function that used to transition the [StateMachine] from one state to the next.
 type Condition func(e *types.Event, c *Context) bool
 
 // And to create boolean conditional expressions
@@ -36,6 +37,7 @@ func IsEventOf(replica types.ReplicaID) Condition {
 	}
 }
 
+// IsEventOfF accepts a function to specify the replica and returns true if the event is of that corresponding replica.
 func IsEventOfF(replicaFunc func(*types.Event, *Context) (types.ReplicaID, bool)) Condition {
 	return func(e *types.Event, c *Context) bool {
 		rID, ok := replicaFunc(e, c)
@@ -60,7 +62,7 @@ func IsMessageReceive() Condition {
 	}
 }
 
-// IsEventType condition returns true if the event is GenericEventType with T == t
+// IsEventType condition returns true if the event is of type [types.GenericEventType] with T == t
 func IsEventType(t string) Condition {
 	return func(e *types.Event, c *Context) bool {
 		eType, ok := e.Type.(*types.GenericEventType)
@@ -128,6 +130,7 @@ func IsMessageToF(replicaF func(*types.Event, *Context) (types.ReplicaID, bool))
 	}
 }
 
+// IsMessage between condition is true when the underlying event is a message between the two specified processes.
 func IsMessageBetween(one, two types.ReplicaID) Condition {
 	return func(e *types.Event, c *Context) bool {
 		message, ok := c.GetMessage(e)

@@ -1,5 +1,7 @@
+// Package type defines the common data structures used internally and for defining tests/strategies in Netrix.
 package types
 
+// EventID is a unique identifier for each event
 type EventID uint64
 
 // EventType abstract type for representing different types of events
@@ -26,6 +28,7 @@ type Event struct {
 	Timestamp int64 `json:"timestamp"`
 }
 
+// NewEvent creates an [Event] with the specified values
 func NewEvent(replica ReplicaID, t EventType, ts string, id EventID, time int64) *Event {
 	return &Event{
 		Replica:   replica,
@@ -36,6 +39,8 @@ func NewEvent(replica ReplicaID, t EventType, ts string, id EventID, time int64)
 	}
 }
 
+// MessageID returns the message ID of the corresponding message when the event type is either
+// a message send or a message receive. The second return value is false otherwise
 func (e *Event) MessageID() (MessageID, bool) {
 	switch eType := e.Type.(type) {
 	case *MessageReceiveEventType:
@@ -46,6 +51,7 @@ func (e *Event) MessageID() (MessageID, bool) {
 	return "", false
 }
 
+// IsMessageSend is true when the event is of type message send
 func (e *Event) IsMessageSend() bool {
 	switch e.Type.(type) {
 	case *MessageSendEventType:
@@ -54,6 +60,7 @@ func (e *Event) IsMessageSend() bool {
 	return false
 }
 
+// IsMessageReceive is true when the event is of type message receive
 func (e *Event) IsMessageReceive() bool {
 	switch e.Type.(type) {
 	case *MessageReceiveEventType:
@@ -62,6 +69,8 @@ func (e *Event) IsMessageReceive() bool {
 	return false
 }
 
+// Timeout returns the corresponding timeout if the event is of type either
+// timeout start or timeout end. The second return value is false otherwise.
 func (e *Event) Timeout() (*ReplicaTimeout, bool) {
 	switch eType := e.Type.(type) {
 	case *TimeoutStartEventType:
@@ -72,6 +81,7 @@ func (e *Event) Timeout() (*ReplicaTimeout, bool) {
 	return nil, false
 }
 
+// IsTimeoutStart returns true when the event is of type timeout start.
 func (e *Event) IsTimeoutStart() bool {
 	switch e.Type.(type) {
 	case *TimeoutStartEventType:
@@ -80,6 +90,7 @@ func (e *Event) IsTimeoutStart() bool {
 	return false
 }
 
+// IsTimeoutEnd returns true when the event is of type timeout end.
 func (e *Event) IsTimeoutEnd() bool {
 	switch e.Type.(type) {
 	case *TimeoutEndEventType:
@@ -88,6 +99,7 @@ func (e *Event) IsTimeoutEnd() bool {
 	return false
 }
 
+// IsGeneric is true when the event is of type [GenericEventType].
 func (e *Event) IsGeneric() bool {
 	switch e.Type.(type) {
 	case *GenericEventType:

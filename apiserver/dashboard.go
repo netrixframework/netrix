@@ -16,8 +16,8 @@ type DashboardRouter interface {
 	SetupRouter(*gin.RouterGroup)
 }
 
-// HandleDashboardName is the handler for `/dashboard/name` route of the APIServer
-func (srv *APIServer) HandleDashboardName(c *gin.Context) {
+// handleDashboardName is the handler for `/dashboard/name` route of the APIServer
+func (srv *APIServer) handleDashboardName(c *gin.Context) {
 	if srv.dashboard == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "no dashboard router set",
@@ -29,7 +29,6 @@ func (srv *APIServer) HandleDashboardName(c *gin.Context) {
 	})
 }
 
-// HandleDashboard is the handler for the router `/dashboard`
-func (srv *APIServer) HandleDashboard(c *gin.Context) {
+func (srv *APIServer) handleDashboard(c *gin.Context) {
 
 }

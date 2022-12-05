@@ -87,6 +87,7 @@ func (t *TestCase) assert() bool {
 	return t.StateMachine.InSuccessState()
 }
 
+// Reset clears the stats of the filter set and allows running the testcase again
 func (t *TestCase) Reset() {
 	t.aborted = false
 	t.once = new(sync.Once)

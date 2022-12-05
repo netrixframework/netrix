@@ -1,3 +1,7 @@
+// Package strategies provides the framework to define testing strategies.
+//
+// Test strategy can incorporate any exploration logic and run for a specified number of iterations.
+// The package provides some inbuilt strategies like PCTCP and unittest (running a unit test for many iterations)
 package strategies
 
 import (
@@ -10,8 +14,10 @@ import (
 	"github.com/netrixframework/netrix/types"
 )
 
+// Context here references to the execution context of a strategy
 type Context struct {
 	*sm.Context
+	// ActionSequence stores the sequence of actions performed in the current iteration
 	ActionSequence *types.List[*Action]
 	curIteration   int
 	abortCh        chan struct{}
@@ -30,6 +36,7 @@ func newContext(ctx *context.RootContext) *Context {
 	}
 }
 
+// CurIteration returns the current iteration number
 func (c *Context) CurIteration() int {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -37,7 +44,7 @@ func (c *Context) CurIteration() int {
 	return c.curIteration
 }
 
-func (c *Context) NextIteration() {
+func (c *Context) nextIteration() {
 	c.ActionSequence.RemoveAll()
 	c.EventDAG.Reset()
 	c.Vars.Reset()
@@ -47,21 +54,22 @@ func (c *Context) NextIteration() {
 	c.curIteration++
 }
 
-func (c *Context) AbortCh() <-chan struct{} {
-	return c.abortCh
-}
-
+// Abort the current iteration
 func (c *Context) Abort() {
 	c.once.Do(func() {
 		close(c.abortCh)
 	})
 }
 
+// Action that the strategy can perform
 type Action struct {
+	// Unique name for the action
 	Name string
-	Do   func(*Context, *apiserver.APIServer) error
+	// Function that performs the action
+	Do func(*Context, *apiserver.APIServer) error
 }
 
+// DeliverMessage action that delivered the given message using [apiserver.APIServer]
 func DeliverMessage(m *types.Message) *Action {
 	return &Action{
 		Name: "DeliverMessage_" + string(m.ID),
@@ -74,6 +82,7 @@ func DeliverMessage(m *types.Message) *Action {
 	}
 }
 
+// DeliverMany action delivered all the specified messages
 func DeliverMany(messages []*types.Message) *Action {
 	return &Action{
 		Name: "DeliverManyMessages",
@@ -93,6 +102,7 @@ func DeliverMany(messages []*types.Message) *Action {
 
 var doNothingAction = "_nothing"
 
+// DoNothing is a no-op action
 func DoNothing() *Action {
 	return &Action{
 		Name: doNothingAction,
@@ -102,6 +112,7 @@ func DoNothing() *Action {
 	}
 }
 
+// ActionSequence actions executes actions in a sequence
 func ActionSequence(actions ...Action) *Action {
 	return &Action{
 		Name: "Sequence",
@@ -117,11 +128,20 @@ func ActionSequence(actions ...Action) *Action {
 	}
 }
 
+// Strategy interface to define an exploration strategy
+// An exploration strategy should be encoded in this strategy
 type Strategy interface {
 	types.Service
+	// ActionsCh should return a channel that is used to
+	// communicate the actions that needs to be performed
 	ActionsCh() *types.Channel[*Action]
+	// Step is called for each event, actions to be performed can be decided within the step call
 	Step(*types.Event, *Context)
+	// EndCurIteration is called at the end of every iteration
 	EndCurIteration(*Context)
+	// NextIteration is called at the beginning of every iteration
 	NextIteration(*Context)
+	// Finalize is called after executing all the iteration.
+	// This function can be used to record/log telemetry or other stats
 	Finalize(*Context)
 }

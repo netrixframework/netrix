@@ -6,19 +6,19 @@ import (
 	"github.com/netrixframework/netrix/types"
 )
 
-type TestCaseDriver struct {
+type testCaseDriver struct {
 	TestCase *TestCase
 	ctx      *Context
 }
 
-func NewTestDriver(ctx *context.RootContext, testcase *TestCase) *TestCaseDriver {
-	return &TestCaseDriver{
+func NewTestDriver(ctx *context.RootContext, testcase *TestCase) *testCaseDriver {
+	return &testCaseDriver{
 		TestCase: testcase,
 		ctx:      NewContext(ctx, testcase),
 	}
 }
 
-func (d *TestCaseDriver) Step(e *types.Event) []*types.Message {
+func (d *testCaseDriver) Step(e *types.Event) []*types.Message {
 	d.ctx.reportStore.Log(map[string]string{
 		"testcase":   d.TestCase.Name,
 		"type":       "event",
@@ -37,6 +37,6 @@ func (d *TestCaseDriver) Step(e *types.Event) []*types.Message {
 	return messages
 }
 
-func (d *TestCaseDriver) setup() error {
+func (d *testCaseDriver) setup() error {
 	return d.TestCase.Setup(d.ctx)
 }

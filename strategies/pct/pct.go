@@ -1,3 +1,4 @@
+// Package pct defines the PCTCP testing strategy
 package pct
 
 import (
@@ -9,6 +10,7 @@ import (
 	"github.com/netrixframework/netrix/types"
 )
 
+// PCTStrategyConfig contains the configuration for PCTCP strategy
 type PCTStrategyConfig struct {
 	RandSrc        rand.Source
 	MaxEvents      int
@@ -17,6 +19,8 @@ type PCTStrategyConfig struct {
 	RecordFilePath string
 }
 
+// PCTStrategy type implements [strategies.Strategy] and encodes the logic of
+// PCTCP exploration strategy - https://dl.acm.org/doi/10.1145/3276530
 type PCTStrategy struct {
 	*types.BaseService
 
@@ -27,7 +31,7 @@ type PCTStrategy struct {
 	config            *PCTStrategyConfig
 	rand              *rand.Rand
 	mo                MessageOrder
-	chainPartition    *ChainPartition
+	chainPartition    *chainPartition
 	lock              *sync.Mutex
 	records           *records
 	Actions           *types.Channel[*strategies.Action]
@@ -35,7 +39,7 @@ type PCTStrategy struct {
 
 var _ strategies.Strategy = &PCTStrategy{}
 
-// TODO: handle for 0 d
+// Creates a new PCTStrategy with the specified config
 func NewPCTStrategy(config *PCTStrategyConfig) *PCTStrategy {
 	var messageOrder MessageOrder = NewDefaultMessageOrder()
 	if config.MessageOrder != nil {
@@ -50,7 +54,7 @@ func NewPCTStrategy(config *PCTStrategyConfig) *PCTStrategy {
 		totalChains:       0,
 		config:            config,
 		mo:                messageOrder,
-		chainPartition:    NewChainPartition(messageOrder),
+		chainPartition:    newChainPartition(messageOrder),
 		lock:              new(sync.Mutex),
 		records:           newRecords(config.RecordFilePath),
 		Actions:           types.NewChannel[*strategies.Action](),
@@ -81,7 +85,7 @@ func (p *PCTStrategy) setup() {
 	p.mo.Reset()
 }
 
-func (p *PCTStrategy) AddMessage(m *Message, ctx *strategies.Context) {
+func (p *PCTStrategy) AddMessage(m *pctMessage, ctx *strategies.Context) {
 	chainID, new := p.chainPartition.AddEvent(m)
 	if new {
 		p.records.IncrChains(ctx.CurIteration())
@@ -108,9 +112,9 @@ func (p *PCTStrategy) AddMessage(m *Message, ctx *strategies.Context) {
 	}).Debug("Added message to chain partition")
 }
 
-func (p *PCTStrategy) Schedule() (*Message, bool) {
+func (p *PCTStrategy) Schedule() (*pctMessage, bool) {
 	highestPriority := 0
-	var theEvent *Message = nil
+	var theEvent *pctMessage = nil
 	var eventChainID int
 	for _, chainID := range p.chainPartition.EnabledChains() {
 		priority, ok := p.priorityMap.Get(chainID)
@@ -146,7 +150,7 @@ func (p *PCTStrategy) Step(e *types.Event, ctx *strategies.Context) {
 			return
 		}
 		p.mo.AddSendEvent(message)
-		p.AddMessage(NewMessage(message), ctx)
+		p.AddMessage(newPCTMessage(message), ctx)
 	} else if e.IsMessageReceive() {
 		message, ok := ctx.GetMessage(e)
 		if ok {

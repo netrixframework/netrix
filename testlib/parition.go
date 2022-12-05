@@ -10,8 +10,10 @@ import (
 )
 
 var (
-	ErrNotEnoughReplicas  = errors.New("not enough replicas")
-	ErrSizeLabelsMismatch = errors.New("sizes and labels are not of the same length")
+	// ErrNotEnoughReplicas occurs when creating a partition with a total size greater than the existing number of replicas
+	ErrNotEnoughReplicas = errors.New("not enough replicas")
+	// ErrSizeLabelsMismatch occurs when the number of labels does not match the number of partitions
+	ErrSizeLabelsMismatch = errors.New("not enough labels")
 )
 
 type part struct {
@@ -32,12 +34,15 @@ func (p *part) add(r types.ReplicaID) {
 	p.replicas[r] = true
 }
 
+// Partition represents a logical partition between the replicas
+// Partition can be used in filters and conditions to decide message delivery
 type Partition struct {
 	parts    map[string]*part
 	replicas map[types.ReplicaID]string
 	lock     *sync.Mutex
 }
 
+// NewRandomPartition creates a partition where replicas are assigned to partitions randomly
 func NewRandomPartition(sizes []int, labels []string) (*Partition, error) {
 	if len(sizes) != len(labels) {
 		return nil, ErrSizeLabelsMismatch
@@ -55,6 +60,7 @@ func NewRandomPartition(sizes []int, labels []string) (*Partition, error) {
 	return partition, nil
 }
 
+// Setup populates the partition
 func (p *Partition) Setup(ctx *Context) error {
 	p.lock.Lock()
 
@@ -93,6 +99,7 @@ func (p *Partition) Setup(ctx *Context) error {
 	return nil
 }
 
+// InPart returns true when the replica belongs to the specified part
 func (p *Partition) InPart(replica types.ReplicaID, partLabel string) bool {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -105,6 +112,7 @@ func (p *Partition) InPart(replica types.ReplicaID, partLabel string) bool {
 	return exists
 }
 
+// GetPartLabel returns the part label the replica belongs to (if there is one), the second return value is false otherwise
 func (p *Partition) GetPartLabel(replica types.ReplicaID) (string, bool) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -112,6 +120,7 @@ func (p *Partition) GetPartLabel(replica types.ReplicaID) (string, bool) {
 	return label, ok
 }
 
+// String serializes the partition, used for logging.
 func (p *Partition) String() string {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -130,6 +139,7 @@ func (p *Partition) String() string {
 	return string(bytes)
 }
 
+// IsolateNode is a filter that drops all messages from and to the specified replica.
 func IsolateNode(replica types.ReplicaID) FilterFunc {
 	return func(e *types.Event, ctx *Context) (messages []*types.Message, handled bool) {
 		message, ok := ctx.GetMessage(e)

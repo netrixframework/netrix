@@ -62,7 +62,7 @@ func (b *BaseService) StartRunning() {
 	b.running = true
 }
 
-// StopRunning is called to unset the running flag
+// StopRunning is called to unset the running flag.
 func (b *BaseService) StopRunning() {
 	b.Logger.Debug("Stopping service")
 	b.lock.Lock()
@@ -74,23 +74,24 @@ func (b *BaseService) StopRunning() {
 	})
 }
 
-// Name returns the name of the service
+// Name returns the name of the service.
 func (b *BaseService) Name() string {
 	return b.name
 }
 
-// Running returns the flag
+// Running returns the flag.
 func (b *BaseService) Running() bool {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 	return b.running
 }
 
-// QuitCh returns the quit channel which will be closed when the service stops running
+// QuitCh returns the quit channel which will be closed when the service stops running.
 func (b *BaseService) QuitCh() <-chan struct{} {
 	return b.quit
 }
 
+// SetLogger assigns to [BaseService.Logger] the specified value.
 func (b *BaseService) SetLogger(logger *log.Logger) {
 	b.Logger = logger
 }

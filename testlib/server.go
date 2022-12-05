@@ -1,3 +1,6 @@
+// Package testlib is the library for creating and running unit tests.
+//
+// The package defines a test driver (TestingServer) that can be invoked with the created unit tests.
 package testlib
 
 import (

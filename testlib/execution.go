@@ -11,7 +11,7 @@ import (
 
 type executionState struct {
 	allowEvents    bool
-	testcaseDriver *TestCaseDriver
+	testcaseDriver *testCaseDriver
 	lock           *sync.Mutex
 }
 
@@ -46,7 +46,7 @@ func (e *executionState) NewTestCase(
 	return driver.setup()
 }
 
-func (e *executionState) CurTestCaseDriver() *TestCaseDriver {
+func (e *executionState) CurTestCaseDriver() *testCaseDriver {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	return e.testcaseDriver
@@ -130,13 +130,10 @@ MainLoop:
 			"type":     "testcase_result",
 			"result":   okS,
 		})
-		// TODO: Figure out a way to cleanly clear the message pool
-		// Reset the servers and flush the queues after waiting for some time
 		if err := srv.apiserver.RestartAll(); err != nil {
 			srv.Logger.With(log.LogParams{"error": err}).Error("Failed to restart replicas! Aborting!")
 			break MainLoop
 		}
-		// TODO: need to wait for in transit messages before invoking reset
 		srv.ctx.Reset()
 	}
 	close(srv.doneCh)

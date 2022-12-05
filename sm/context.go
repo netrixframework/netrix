@@ -6,6 +6,8 @@ import (
 	"github.com/netrixframework/netrix/types"
 )
 
+// Context used to step the state machine.
+// The Context is passed to the [Condition].
 type Context struct {
 	MessagePool  *types.Map[types.MessageID, *types.Message]
 	ReplicaStore *types.ReplicaStore
@@ -14,6 +16,7 @@ type Context struct {
 	Logger       *log.Logger
 }
 
+// NewContext creates a new context from the global context object.
 func NewContext(ctx *context.RootContext, logger *log.Logger) *Context {
 	return &Context{
 		MessagePool:  ctx.MessageStore,
@@ -24,6 +27,8 @@ func NewContext(ctx *context.RootContext, logger *log.Logger) *Context {
 	}
 }
 
+// GetMessage helper function used to fetch the message for the corresponding event
+// This returns the message only when the event is a send or a receive.
 func (c *Context) GetMessage(e *types.Event) (*types.Message, bool) {
 	if !e.IsMessageSend() && !e.IsMessageReceive() {
 		return nil, false

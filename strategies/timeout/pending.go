@@ -61,10 +61,10 @@ func (t *TimeoutStrategy) updatePendingEvents(e *types.Event, ctx *strategies.Co
 		t.records.updateEvents(ctx, false)
 		receiveSymbol := t.z3context.RealConst(pEvent.label)
 		t.symbolMap.Add(pEvent.label, receiveSymbol)
-		delayVal := t.config.DelayValue()
+		delayVal := t.config.delayValue()
 		t.delayVals.Add(string(messageID), delayVal)
 		t.records.updateDistVal(ctx, delayVal)
-		if t.config.UseDistribution() {
+		if t.config.useDistribution() {
 			pEvent.constraints = append(
 				pEvent.constraints,
 				sendSymbol.Mul(t.config.driftMin(t.z3context)).Add(t.z3context.Int(delayVal)).Le(receiveSymbol),

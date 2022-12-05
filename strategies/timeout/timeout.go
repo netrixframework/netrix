@@ -1,3 +1,4 @@
+// Package timeout encodes a strategy where timeout durations are chosen non deterministically
 package timeout
 
 import (
@@ -15,9 +16,11 @@ import (
 )
 
 var (
+	// ErrBadConfig is returned when creating the strategy config and the required parameters are absent
 	ErrBadConfig = errors.New("one of MaxMessageDelay or DelayDistribution should be specified")
 )
 
+// Distribution encodes a probability distribution to sample values from
 type Distribution interface {
 	Rand() int
 }
@@ -42,7 +45,7 @@ type TimeoutStrategyConfig struct {
 	PendingEventThreshold int
 }
 
-func (c *TimeoutStrategyConfig) UseDistribution() bool {
+func (c *TimeoutStrategyConfig) useDistribution() bool {
 	return c.DelayDistribution != nil && c.Nondeterministic
 }
 
@@ -59,7 +62,7 @@ func (c *TimeoutStrategyConfig) validate() error {
 	return nil
 }
 
-func (c *TimeoutStrategyConfig) DelayValue() int {
+func (c *TimeoutStrategyConfig) delayValue() int {
 	if c.DelayDistribution != nil && c.Nondeterministic {
 		// max := math.Min(float64(c.MaxMessageDelay.Milliseconds()), float64(c.DelayDistribution.Rand()))
 		// return int(max)
@@ -78,6 +81,7 @@ func (c *TimeoutStrategyConfig) driftMin(ctx *z3.Context) *z3.AST {
 	return one.Sub(ctx.Real(c.ClockDrift, 100)).Div(one.Add(ctx.Real(c.ClockDrift, 100)))
 }
 
+// FireTimeout action instructs the replica to fire a timeout
 func FireTimeout(t *types.ReplicaTimeout) *strategies.Action {
 	return &strategies.Action{
 		Name: "FireTimeout",
@@ -90,6 +94,9 @@ func FireTimeout(t *types.ReplicaTimeout) *strategies.Action {
 	}
 }
 
+// TimeoutStrategy is an experimental strategy to test distributed systems.
+// We non deterministically set the duration of the timeout while maintaining
+// the constraints imposed by a natural monotonic order of time.
 type TimeoutStrategy struct {
 	Actions         *types.Channel[*strategies.Action]
 	pendingEvents   *types.Map[string, *pendingEvent]
@@ -108,6 +115,7 @@ type TimeoutStrategy struct {
 
 var _ strategies.Strategy = &TimeoutStrategy{}
 
+// NewTimeoutStrategy creates a new [TimeoutStrategy] with the corresponding config. Returns and error when the config is invalid
 func NewTimeoutStrategy(config *TimeoutStrategyConfig) (*TimeoutStrategy, error) {
 	if err := config.validate(); err != nil {
 		return nil, err
@@ -255,11 +263,11 @@ func (t *TimeoutStrategy) updateConstraints(e *types.Event, ctx *strategies.Cont
 		if isParentReceive {
 			delayVal, ok := t.delayVals.Get(messageID)
 			if !ok {
-				delayVal = t.config.DelayValue()
+				delayVal = t.config.delayValue()
 				t.delayVals.Add(messageID, delayVal)
 			}
 			t.records.updateDistVal(ctx, delayVal)
-			if t.config.UseDistribution() {
+			if t.config.useDistribution() {
 				constraints = append(
 					constraints,
 					pSymbol.Mul(t.config.driftMin(t.z3context)).Add(t.z3context.Int(delayVal)).Le(eSymbol),

@@ -23,7 +23,7 @@ type Context struct {
 	reportStore *types.ReportLogs
 }
 
-// newContext instantiates a Context from the RootContext
+// NewContext instantiates a Context from the RootContext
 func NewContext(c *context.RootContext, testcase *TestCase) *Context {
 	return &Context{
 		Context:     sm.NewContext(c, testcase.Logger),
@@ -33,6 +33,7 @@ func NewContext(c *context.RootContext, testcase *TestCase) *Context {
 	}
 }
 
+// NewContextFrom instantiates a context from the specified state machine context and testcase.
 func NewContextFrom(sm *sm.Context, testcase *TestCase) *Context {
 	return &Context{
 		Context:     sm,
@@ -42,6 +43,7 @@ func NewContextFrom(sm *sm.Context, testcase *TestCase) *Context {
 	}
 }
 
+// CreatePartition creates a new partition with the specified sizes and labels
 func (c *Context) CreatePartition(sizes []int, labels []string) {
 	partition, err := NewRandomPartition(sizes, labels)
 	if err != nil {
@@ -74,6 +76,7 @@ func (c *Context) NewMessage(cur *types.Message, data []byte, pMsg types.ParsedM
 	}
 }
 
+// Log adds a report log for the current testcase
 func (c *Context) Log(keyvals map[string]string) {
 	if c.reportStore == nil {
 		return

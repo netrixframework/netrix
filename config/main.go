@@ -1,3 +1,4 @@
+// Package config defines the configuration data structures used by Netrix
 package config
 
 import (
@@ -7,11 +8,11 @@ import (
 )
 
 var (
-	// ConfigPath is the variable which stores the config path command line parameter
+	// ConfigPath contains the command line parameter value use in the [github.com/netrixframework/netrix/cmd] package.
 	ConfigPath string
 )
 
-// Config stores the config for the tool
+// Config parameters for Netrix
 type Config struct {
 	// NumReplicas number of replicas that are in the distributed system
 	NumReplicas int `json:"num_replicas"`

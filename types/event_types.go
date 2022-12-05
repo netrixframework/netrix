@@ -65,50 +65,60 @@ func (r *MessageReceiveEventType) String() string {
 	return fmt.Sprintf("MessageReceive { %s }", r.MessageID)
 }
 
+// TimeoutStartEventType represents a timeout start event
 type TimeoutStartEventType struct {
 	Timeout *ReplicaTimeout
 }
 
+// NewTimeoutStartEventType creates a new [TimeoutStartEventType] with the specified timeout
 func NewTimeoutStartEventType(timeout *ReplicaTimeout) *TimeoutStartEventType {
 	return &TimeoutStartEventType{
 		Timeout: timeout,
 	}
 }
 
+// Clone returns a copy
 func (ts *TimeoutStartEventType) Clone() EventType {
 	return &TimeoutStartEventType{
 		Timeout: ts.Timeout,
 	}
 }
 
+// Type returns "TimeoutStartEventType"
 func (ts *TimeoutStartEventType) Type() string {
 	return "TimeoutStartEventType"
 }
 
+// String serializes the timeout start event
 func (ts *TimeoutStartEventType) String() string {
 	return fmt.Sprintf("TimeoutStart { %s, %s }", ts.Timeout.Replica, ts.Timeout.Type)
 }
 
+// TimeoutEndEventType represents a timeout end event
 type TimeoutEndEventType struct {
 	Timeout *ReplicaTimeout
 }
 
+// NewTimeoutEndEventType creates a new [TimeoutEventEventType]
 func NewTimeoutEndEventType(timeout *ReplicaTimeout) *TimeoutEndEventType {
 	return &TimeoutEndEventType{
 		Timeout: timeout,
 	}
 }
 
+// Clone returns a copy
 func (te *TimeoutEndEventType) Clone() EventType {
 	return &TimeoutEndEventType{
 		Timeout: te.Timeout,
 	}
 }
 
+// Type returns "TimeoutEndEventType"
 func (te *TimeoutEndEventType) Type() string {
 	return "TimeoutEndEventType"
 }
 
+// String serializes the timeout end event type
 func (te *TimeoutEndEventType) String() string {
 	return fmt.Sprintf("TimeoutEnd { %s, %s }", te.Timeout.Replica, te.Timeout.Type)
 }

@@ -8,11 +8,13 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
+// Map[T,V] is a generic thread safe map of key type [T] and value type [V]
 type Map[T constraints.Ordered, V any] struct {
 	m    map[T]V
 	lock *sync.Mutex
 }
 
+// NewMap[T,V] creates an empty Map
 func NewMap[T constraints.Ordered, V any]() *Map[T, V] {
 	return &Map[T, V]{
 		m:    make(map[T]V),
@@ -119,10 +121,12 @@ func (s *Map[T, V]) RandomValueWithSource(src rand.Source) (V, bool) {
 	return s.Get(rID)
 }
 
+// Set[T] is thread safe generic set implementation
 type Set[T constraints.Ordered] struct {
 	m *Map[T, T]
 }
 
+// NewSet[T] creates an empty Set
 func NewSet[T constraints.Ordered]() *Set[T] {
 	return &Set[T]{
 		m: NewMap[T, T](),
@@ -149,12 +153,14 @@ func (s *Set[T]) Size() int {
 	return s.m.Size()
 }
 
+// List[V] is a generic thread safe list
 type List[V any] struct {
 	elems []V
 	size  int
 	lock  *sync.Mutex
 }
 
+// NewEmptyList[V] creates an empty List
 func NewEmptyList[V any]() *List[V] {
 	return &List[V]{
 		elems: make([]V, 0),
@@ -163,6 +169,7 @@ func NewEmptyList[V any]() *List[V] {
 	}
 }
 
+// NewList[V] copies the contents of the specified list onto a new List object
 func NewList[V any](cur []V) *List[V] {
 	elements := make([]V, len(cur))
 	copy(elements, cur)
@@ -215,6 +222,7 @@ func (l *List[V]) RemoveAll() []V {
 	return result
 }
 
+// Max[T] abstracts the max function for all ordered types T
 func Max[T constraints.Ordered](one, two T) T {
 	if one > two {
 		return one

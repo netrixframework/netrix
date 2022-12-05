@@ -6,7 +6,7 @@ import (
 	"github.com/netrixframework/netrix/types"
 )
 
-type Message struct {
+type pctMessage struct {
 	messageID types.MessageID
 	from      types.ReplicaID
 	to        types.ReplicaID
@@ -14,20 +14,20 @@ type Message struct {
 }
 
 // Lt returns true if e < other in the given message order
-func (e *Message) Lt(mo MessageOrder, other *Message) bool {
+func (e *pctMessage) Lt(mo MessageOrder, other *pctMessage) bool {
 	return mo.Lt(e.messageID, other.messageID)
 }
 
-func (e *Message) HasLabel() bool {
+func (e *pctMessage) HasLabel() bool {
 	return e.label != -1
 }
 
-func (e *Message) Label() int {
+func (e *pctMessage) Label() int {
 	return e.label
 }
 
-func NewMessage(message *types.Message) *Message {
-	return &Message{
+func newPCTMessage(message *types.Message) *pctMessage {
+	return &pctMessage{
 		messageID: message.ID,
 		to:        message.To,
 		from:      message.From,
@@ -35,19 +35,24 @@ func NewMessage(message *types.Message) *Message {
 	}
 }
 
+// MessageOrder interface defines the message order for PCTCP to partition messages into chains
 type MessageOrder interface {
+	// AddSendEvent is triggered when a send event of the corresponding message is processed
 	AddSendEvent(*types.Message)
+	// AddRecvEvent is triggered when a receive event of the corresponding message is processed
 	AddRecvEvent(*types.Message)
+	// Lt should return true if m_1 < m_2
 	Lt(types.MessageID, types.MessageID) bool
+	// Reset forgets all stored information and is invoked at the end of each iteration
 	Reset()
 }
 
-type VCValue struct {
+type vcValue struct {
 	vals map[types.ReplicaID]int
 }
 
-func DefaultVCValue(replica types.ReplicaID) *VCValue {
-	val := &VCValue{
+func defaultVCValue(replica types.ReplicaID) *vcValue {
+	val := &vcValue{
 		vals: make(map[types.ReplicaID]int),
 	}
 	val.vals[replica] = 0
@@ -55,7 +60,7 @@ func DefaultVCValue(replica types.ReplicaID) *VCValue {
 }
 
 // Lt Returns true if v < other
-func (v *VCValue) Lt(other *VCValue) bool {
+func (v *vcValue) Lt(other *vcValue) bool {
 	oneLess := false
 	for r, val := range v.vals {
 		valO, ok := other.vals[r]
@@ -69,8 +74,8 @@ func (v *VCValue) Lt(other *VCValue) bool {
 	return oneLess
 }
 
-func (v *VCValue) Next(replica types.ReplicaID) *VCValue {
-	new := &VCValue{
+func (v *vcValue) Next(replica types.ReplicaID) *vcValue {
+	new := &vcValue{
 		vals: make(map[types.ReplicaID]int),
 	}
 	for r, val := range v.vals {
@@ -86,7 +91,7 @@ func (v *VCValue) Next(replica types.ReplicaID) *VCValue {
 	return new
 }
 
-func (v *VCValue) String() string {
+func (v *vcValue) String() string {
 	result := "{ "
 	for r, v := range v.vals {
 		result += fmt.Sprintf("%s:%d ", r, v)
@@ -95,19 +100,21 @@ func (v *VCValue) String() string {
 	return result
 }
 
+// DefaultMessageOrder implements [MessageOrder] and tracks the causal ordering of messages.
+// Two messages m_1 and m_2 are related by m_1 < m_2 iff recv(m_1) < send(m_2)
 type DefaultMessageOrder struct {
-	latest       *types.Map[types.ReplicaID, *VCValue]
-	sendVCValues *types.Map[types.MessageID, *VCValue]
-	recvVCValues *types.Map[types.MessageID, *VCValue]
+	latest       *types.Map[types.ReplicaID, *vcValue]
+	sendVCValues *types.Map[types.MessageID, *vcValue]
+	recvVCValues *types.Map[types.MessageID, *vcValue]
 }
 
 var _ MessageOrder = &DefaultMessageOrder{}
 
 func NewDefaultMessageOrder() *DefaultMessageOrder {
 	return &DefaultMessageOrder{
-		latest:       types.NewMap[types.ReplicaID, *VCValue](),
-		sendVCValues: types.NewMap[types.MessageID, *VCValue](),
-		recvVCValues: types.NewMap[types.MessageID, *VCValue](),
+		latest:       types.NewMap[types.ReplicaID, *vcValue](),
+		sendVCValues: types.NewMap[types.MessageID, *vcValue](),
+		recvVCValues: types.NewMap[types.MessageID, *vcValue](),
 	}
 }
 
@@ -118,7 +125,7 @@ func (eo *DefaultMessageOrder) AddSendEvent(e *types.Message) {
 
 	latest, ok := eo.latest.Get(e.From)
 	if !ok {
-		vcVal := DefaultVCValue(e.From)
+		vcVal := defaultVCValue(e.From)
 		eo.latest.Add(e.From, vcVal)
 		eo.sendVCValues.Add(e.ID, vcVal)
 		return
@@ -137,12 +144,12 @@ func (eo *DefaultMessageOrder) AddRecvEvent(e *types.Message) {
 
 	cur, ok := eo.latest.Get(e.To)
 	if !ok {
-		cur = DefaultVCValue(e.To)
+		cur = defaultVCValue(e.To)
 	} else {
 		cur = cur.Next(e.To)
 	}
 
-	recvVCValue := &VCValue{vals: make(map[types.ReplicaID]int)}
+	recvVCValue := &vcValue{vals: make(map[types.ReplicaID]int)}
 	replicas := make(map[types.ReplicaID]bool)
 	if sendExists {
 		for replica := range sendVCValue.vals {

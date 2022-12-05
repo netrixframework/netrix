@@ -1,3 +1,7 @@
+// Package apiserver implements the API interface of Netrix.
+//
+// The package is used internally by Netrix to instantiate an API interface.
+// The package also contains the interface to invoke directives and send messages to processes/replicas.
 package apiserver
 
 import (
@@ -20,7 +24,10 @@ import (
 const DefaultAddr = "0.0.0.0:7074"
 
 // APIServer runs a HTTP server to receive messages from
-// the replicas and provide an interactive dashboard
+// the replicas. APIServer is used to send messages and
+// directives to the replicas.
+
+// APIServer implements [types.Service] interface.
 type APIServer struct {
 	router        *gin.Engine
 	ctx           *context.RootContext
@@ -61,13 +68,13 @@ func NewAPIServer(ctx *context.RootContext, messageParser types.MessageParser, d
 	router.GET("/", func(c *gin.Context) {
 		c.Redirect(http.StatusMovedPermanently, "/dashboard/app")
 	})
-	router.POST("/message", server.HandleMessage)
-	router.POST("/event", server.HandleEvent)
-	router.POST("/replica", server.HandleReplicaPost)
+	router.POST("/message", server.handleMessage)
+	router.POST("/event", server.handleEvent)
+	router.POST("/replica", server.handleReplicaPost)
 
 	router.GET("/replicas", server.handleReplicas)
 	router.GET("/replicas/:replica", server.handleReplicaGet)
-	router.GET("/dashboard/name", server.HandleDashboardName)
+	router.GET("/dashboard/name", server.handleDashboardName)
 
 	_, file, _, _ := runtime.Caller(0)
 	router.StaticFS("/dashboard/app", gin.Dir(path.Join(path.Dir(file), "dist"), false))
@@ -107,7 +114,7 @@ func (a *APIServer) logMiddleware(c *gin.Context) {
 	}).Debug("Handled request")
 }
 
-// Start starts the APIServer and implements Service
+// Start runs the HTTP server and starts listening to the API requests.
 func (a *APIServer) Start() {
 	a.StartRunning()
 	go func() {
@@ -123,7 +130,7 @@ func (a *APIServer) Start() {
 	}()
 }
 
-// Stop stops the APIServer and implements Service
+// Stop terminates the HTTP server.
 func (a *APIServer) Stop() {
 	a.StopRunning()
 	ctx, cancel := goctx.WithTimeout(goctx.Background(), 5*time.Second)

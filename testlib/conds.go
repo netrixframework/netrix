@@ -5,6 +5,7 @@ import (
 	"github.com/netrixframework/netrix/types"
 )
 
+// IsMessageFromPart condition returns true when message is from a replica that belongs to the specified part.
 func IsMessageFromPart(partLabel string) sm.Condition {
 	return func(e *types.Event, c *sm.Context) bool {
 		partition, ok := types.VarSetGet[*Partition](c.Vars, partitionKey)
@@ -19,6 +20,7 @@ func IsMessageFromPart(partLabel string) sm.Condition {
 	}
 }
 
+// IsMessageAcrossPartition condition returns true when the event represents a message between replicas of different partitions.
 func IsMessageAcrossPartition() sm.Condition {
 	return func(e *types.Event, c *sm.Context) bool {
 		message, ok := c.GetMessage(e)
@@ -41,6 +43,7 @@ func IsMessageAcrossPartition() sm.Condition {
 	}
 }
 
+// IsMessageWithinPartition condition returns true when the event represents a message between two replicas of the same partition.
 func IsMessageWithinPartition() sm.Condition {
 	return func(e *types.Event, c *sm.Context) bool {
 		message, ok := c.GetMessage(e)

@@ -1,3 +1,4 @@
+// Package unittest strategy runs the same unit test for each iteration
 package unittest
 
 import (
@@ -12,6 +13,7 @@ import (
 	"github.com/netrixframework/netrix/types"
 )
 
+// TestCaseStrategy runs the unit test for the specified number of iterations
 type TestCaseStrategy struct {
 	*types.BaseService
 	Actions     *types.Channel[*strategies.Action]
@@ -24,6 +26,7 @@ type TestCaseStrategy struct {
 	lock           *sync.Mutex
 }
 
+// NewTestCaseStrategy creates a new TestCaseStrategy
 func NewTestCaseStrategy(testCase *testlib.TestCase, recordFilePath string) *TestCaseStrategy {
 	return &TestCaseStrategy{
 		BaseService:    types.NewBaseService("TestCaseStrategy", nil),

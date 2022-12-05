@@ -5,15 +5,15 @@ import (
 	"fmt"
 )
 
+// Errors that can occur when parsing a message
 var (
-	ErrDuplicateSubs = errors.New("duplicate subscriber")
-	ErrNoSubs        = errors.New("subscriber does not exist")
-	ErrNoData        = errors.New("no data in message")
-	ErrBadParser     = errors.New("bad parser")
-
-	DefaultSubsChSize = 10
+	// ErrNoData occurs when [Message.Data] is empty
+	ErrNoData = errors.New("no data in message")
+	// ErrBadParse occurs when [MessageParser] is nil
+	ErrBadParser = errors.New("bad parser")
 )
 
+// MessageID is a unique identifier for each message
 type MessageID string
 
 // Message stores a message that has been intercepted between two replicas
@@ -28,6 +28,7 @@ type Message struct {
 	Repr          string        `json:"repr"`
 }
 
+// GetParsedMessage[V] type casts [Message.ParsedMessage] to the specified type V.
 func GetParsedMessage[V any](m *Message) (V, bool) {
 	var result V
 	if m.ParsedMessage == nil {
@@ -37,7 +38,7 @@ func GetParsedMessage[V any](m *Message) (V, bool) {
 	return result, ok
 }
 
-// Clone to create a new Message object with the same attributes
+// Clone to create a new Message object with the same attributes.
 func (m *Message) Clone() Clonable {
 	return &Message{
 		From:          m.From,
@@ -51,6 +52,7 @@ func (m *Message) Clone() Clonable {
 	}
 }
 
+// Parse invokes [MessageParser.Parse] with [Message.Data] and the result is stored in [Message.ParsedMessage].
 func (m *Message) Parse(parser MessageParser) error {
 	if parser == nil {
 		return ErrBadParser
