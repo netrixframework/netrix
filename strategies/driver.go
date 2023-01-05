@@ -90,8 +90,8 @@ func (d *Driver) Start() error {
 		}
 		return nil
 	}
+	d.Stop()
 	d.Logger.Info("Completed all iterations")
-	<-d.QuitCh()
 	return nil
 }
 

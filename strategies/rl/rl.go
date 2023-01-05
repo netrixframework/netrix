@@ -1,103 +1,145 @@
 package rl
 
 import (
-	"errors"
+	"sync"
+	"time"
 
 	"github.com/netrixframework/netrix/strategies"
 	"github.com/netrixframework/netrix/types"
 )
 
-type RLStrategyConfig struct {
-	Alpha       float64
-	Gamma       float64
-	Interpreter Interpreter
-	Policy      Policy
-}
+// type RLExplorationStrategyConfig struct {
+// 	Horizon     int
+// 	StateSpace  int
+// 	Iterations  int
+// 	ActionSpace int
+
+// 	// TODO: find the name of these
+// 	Probability float64
+// 	C           float64
+
+// 	Interpreter  ExplorationInterpreter
+// 	TickDuration time.Duration
+// }
 
 type RLStrategy struct {
 	*types.BaseService
-	config        *RLStrategyConfig
-	interpreter   Interpreter
-	policy        Policy
-	saMap         *StateActionMap
-	stateSequence *types.List[State]
-	actions       *types.Channel[*strategies.Action]
+	config      *RLStrategyConfig
+	interpreter Interpreter
+	actions     *types.Channel[*strategies.Action]
+	policy      Policy
+
+	pendingMessages *types.Map[types.MessageID, *types.Message]
+	pendingActions  *types.Map[types.MessageID, chan struct{}]
+	agentTicker     *time.Ticker
+
+	trace         *Trace
+	stepCount     int
+	stepCountLock *sync.Mutex
+}
+
+func NewRLStrategy(config *RLStrategyConfig) *RLStrategy {
+	return &RLStrategy{
+		BaseService: types.NewBaseService("RLExploration", nil),
+		config:      config,
+		interpreter: config.interpreter,
+		actions:     types.NewChannel[*strategies.Action](),
+
+		pendingMessages: types.NewMap[types.MessageID, *types.Message](),
+		pendingActions:  types.NewMap[types.MessageID, chan struct{}](),
+		agentTicker:     time.NewTicker(config.agentTickDuration),
+		trace:           NewTrace(),
+		stepCount:       0,
+		stepCountLock:   new(sync.Mutex),
+	}
 }
 
 var _ strategies.Strategy = &RLStrategy{}
-
-func NewRLStrategy(config *RLStrategyConfig) (*RLStrategy, error) {
-	if config.Alpha < 0 || config.Alpha > 1 {
-		return nil, errors.New("invalid value for Alpha")
-	} else if config.Gamma < 0 || config.Gamma > 1 {
-		return nil, errors.New("invalid value for Gamma")
-	}
-	return &RLStrategy{
-		config:        config,
-		saMap:         newStateActionMap(),
-		interpreter:   config.Interpreter,
-		policy:        config.Policy,
-		stateSequence: types.NewEmptyList[State](),
-		BaseService:   types.NewBaseService("RLStrategy", nil),
-		actions:       types.NewChannel[*strategies.Action](),
-	}, nil
-}
 
 func (r *RLStrategy) ActionsCh() *types.Channel[*strategies.Action] {
 	return r.actions
 }
 
 func (r *RLStrategy) Step(e *types.Event, ctx *strategies.Context) {
-	state := r.interpreter.Interpret(e, ctx)
-	r.stateSequence.Append(state)
-	if _, ok := r.saMap.GetState(state.Hash()); !ok {
-		r.saMap.AddState(state)
-	}
-	actions := r.interpreter.Actions(state, ctx)
-	for _, a := range actions {
-		if !r.saMap.ExistsValue(state.Hash(), a.Name) {
-			r.saMap.Update(state.Hash(), a.Name, 0)
+
+	if e.IsMessageSend() {
+		if message, ok := ctx.GetMessage(e); ok {
+			r.pendingMessages.Add(message.ID, message)
+		}
+	} else if e.IsMessageReceive() {
+		if message, ok := ctx.GetMessage(e); ok {
+			r.pendingMessages.Remove(message.ID)
+			if ch, ok := r.pendingActions.Get(message.ID); ok {
+				close(ch)
+				r.pendingActions.Remove(message.ID)
+			}
 		}
 	}
-	if len(actions) > 0 {
-		action, ok := r.policy.NextAction(r.saMap, state, actions)
-		if ok {
-			r.actions.BlockingAdd(action)
-		}
-	}
+	r.interpreter.Update(e, ctx)
 }
 
 func (r *RLStrategy) EndCurIteration(ctx *strategies.Context) {
-	states := r.stateSequence.Iter()
-	actions := ctx.ActionSequence
-
-	for i, state := range states {
-		action, ok := actions.Elem(i)
-		if !ok {
-			continue
-		}
-		curVal, _ := r.saMap.Get(state.Hash(), action.Name)
-		maxQ, _ := r.saMap.MaxQ(state.Hash())
-		reward := r.interpreter.RewardFunc(state, action)
-		new := (1-r.config.Alpha)*curVal + r.config.Alpha*(reward+r.config.Gamma*maxQ)
-		r.saMap.Update(state.Hash(), action.Name, new)
-	}
 }
 
-func (r *RLStrategy) NextIteration(_ *strategies.Context) {
-	r.stateSequence.RemoveAll()
+func (r *RLStrategy) NextIteration(ctx *strategies.Context) {
+	r.interpreter.Reset()
+	r.policy.NextIteration(ctx.CurIteration(), r.trace)
+	r.trace.Reset()
+	r.stepCountLock.Lock()
+	r.stepCount = 0
+	r.stepCountLock.Unlock()
+	r.pendingMessages.RemoveAll()
+	r.pendingActions.RemoveAll()
 }
 
-func (r *RLStrategy) Finalize(_ *strategies.Context) {
-
+func (r *RLStrategy) Finalize(ctx *strategies.Context) {
 }
 
 func (r *RLStrategy) Start() error {
 	r.BaseService.StartRunning()
+	go r.agentLoop()
 	return nil
 }
 
 func (r *RLStrategy) Stop() error {
 	r.BaseService.StopRunning()
 	return nil
+}
+
+// TODO: Abstract away the agent
+func (r *RLStrategy) agentLoop() {
+	for {
+		select {
+		case <-r.agentTicker.C:
+		case <-r.QuitCh():
+			return
+		}
+		state := r.wrapState(r.interpreter.CurState())
+		possibleActions := state.Actions()
+		if len(possibleActions) == 0 {
+			continue
+		}
+		r.stepCountLock.Lock()
+		step := r.stepCount
+		r.stepCountLock.Unlock()
+		action, ok := r.policy.NextAction(step, state, possibleActions)
+		if ok {
+			r.doAction(action)
+			r.stepCountLock.Lock()
+			r.stepCount += 1
+			r.stepCountLock.Unlock()
+			// TODO: move the select (waiting) here
+			nextState := r.wrapState(r.interpreter.CurState())
+			r.policy.Update(step, state, action, nextState)
+			r.trace.Add(state, action)
+		}
+	}
+}
+
+func (r *RLStrategy) doAction(a *strategies.Action) {
+	ch := make(chan struct{})
+	r.pendingActions.Add(types.MessageID(a.Name), ch)
+	r.actions.BlockingAdd(a)
+
+	<-ch
 }

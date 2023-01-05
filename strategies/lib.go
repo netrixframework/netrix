@@ -72,7 +72,7 @@ type Action struct {
 // DeliverMessage action that delivered the given message using [apiserver.APIServer]
 func DeliverMessage(m *types.Message) *Action {
 	return &Action{
-		Name: "DeliverMessage_" + string(m.ID),
+		Name: string(m.ID),
 		Do: func(ctx *Context, d *apiserver.APIServer) error {
 			if !ctx.MessagePool.Exists(m.ID) {
 				ctx.MessagePool.Add(m.ID, m)
