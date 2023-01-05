@@ -8,19 +8,11 @@ import (
 	"github.com/netrixframework/netrix/types"
 )
 
-// type RLExplorationStrategyConfig struct {
-// 	Horizon     int
-// 	StateSpace  int
-// 	Iterations  int
-// 	ActionSpace int
-
-// 	// TODO: find the name of these
-// 	Probability float64
-// 	C           float64
-
-// 	Interpreter  ExplorationInterpreter
-// 	TickDuration time.Duration
-// }
+type RLStrategyConfig struct {
+	interpreter       Interpreter
+	policy            Policy
+	agentTickDuration time.Duration
+}
 
 type RLStrategy struct {
 	*types.BaseService
