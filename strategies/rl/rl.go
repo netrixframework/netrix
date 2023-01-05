@@ -35,6 +35,7 @@ func NewRLStrategy(config *RLStrategyConfig) *RLStrategy {
 		BaseService: types.NewBaseService("RLExploration", nil),
 		config:      config,
 		interpreter: config.interpreter,
+		policy:      config.policy,
 		actions:     types.NewChannel[*strategies.Action](),
 
 		pendingMessages: types.NewMap[types.MessageID, *types.Message](),
