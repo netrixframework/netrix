@@ -9,9 +9,9 @@ import (
 )
 
 type RLStrategyConfig struct {
-	interpreter       Interpreter
-	policy            Policy
-	agentTickDuration time.Duration
+	Interpreter       Interpreter
+	Policy            Policy
+	AgentTickDuration time.Duration
 }
 
 type RLStrategy struct {
@@ -34,13 +34,13 @@ func NewRLStrategy(config *RLStrategyConfig) *RLStrategy {
 	return &RLStrategy{
 		BaseService: types.NewBaseService("RLExploration", nil),
 		config:      config,
-		interpreter: config.interpreter,
-		policy:      config.policy,
+		interpreter: config.Interpreter,
+		policy:      config.Policy,
 		actions:     types.NewChannel[*strategies.Action](),
 
 		pendingMessages: types.NewMap[types.MessageID, *types.Message](),
 		pendingActions:  types.NewMap[types.MessageID, chan struct{}](),
-		agentTicker:     time.NewTicker(config.agentTickDuration),
+		agentTicker:     time.NewTicker(config.AgentTickDuration),
 		trace:           NewTrace(),
 		stepCount:       0,
 		stepCountLock:   new(sync.Mutex),

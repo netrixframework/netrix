@@ -7,7 +7,7 @@ import (
 	"github.com/netrixframework/netrix/strategies"
 )
 
-type ExplorationPolicyConfig struct {
+type UCBZeroPolicyConfig struct {
 	Horizon     int
 	StateSpace  int
 	Iterations  int
@@ -16,35 +16,35 @@ type ExplorationPolicyConfig struct {
 	C           float64
 }
 
-type ExplorationPolicy struct {
-	config *ExplorationPolicyConfig
-	state  *ExplorationState
+type UCBZeroPolicy struct {
+	config *UCBZeroPolicyConfig
+	state  *UCBZeroState
 }
 
-var _ Policy = &ExplorationPolicy{}
+var _ Policy = &UCBZeroPolicy{}
 
-func NewExplorationPolicy(config *ExplorationPolicyConfig) *ExplorationPolicy {
-	return &ExplorationPolicy{
+func NewUCBZeroPolicy(config *UCBZeroPolicyConfig) *UCBZeroPolicy {
+	return &UCBZeroPolicy{
 		config: config,
-		state:  NewExplorationState(config),
+		state:  NewUCBZeroState(config),
 	}
 }
 
-func (e *ExplorationPolicy) NextAction(step int, state State, actions []*strategies.Action) (*strategies.Action, bool) {
+func (e *UCBZeroPolicy) NextAction(step int, state State, actions []*strategies.Action) (*strategies.Action, bool) {
 	a := e.state.NextAction(step, state, actions)
 	return a, a != nil
 }
 
-func (e *ExplorationPolicy) Update(step int, state State, action *strategies.Action, nextState State) {
+func (e *UCBZeroPolicy) Update(step int, state State, action *strategies.Action, nextState State) {
 	e.state.Update(step, state, action, nextState)
 }
 
-func (e *ExplorationPolicy) NextIteration(iteration int, trace *Trace) {
+func (e *UCBZeroPolicy) NextIteration(iteration int, trace *Trace) {
 
 }
 
-type ExplorationState struct {
-	config        *ExplorationPolicyConfig
+type UCBZeroState struct {
+	config        *UCBZeroPolicyConfig
 	eta           float64
 	defaultQValue float64
 
@@ -55,36 +55,35 @@ type ExplorationState struct {
 	stateValues *stateValues
 }
 
-func NewExplorationState(config *ExplorationPolicyConfig) *ExplorationState {
+func NewUCBZeroState(config *UCBZeroPolicyConfig) *UCBZeroState {
 	eta := math.Log(
 		float64(config.StateSpace) * float64(config.Horizon) * float64(config.ActionSpace) * float64(config.Iterations) / config.Probability,
 	)
-	return &ExplorationState{
+	return &UCBZeroState{
 		config:        config,
 		eta:           eta,
 		defaultQValue: float64(config.Horizon),
 		qValues: &qValues{
-			vals:    make(map[int]map[string]map[string]float64),
-			horizon: config.Horizon,
-			lock:    new(sync.Mutex),
+			vals:          make(map[int]map[string]map[string]float64),
+			defaultQValue: float64(config.Horizon),
+			lock:          new(sync.Mutex),
 		},
 		visitCount: &visitCount{
 			vals: make(map[int]map[string]map[string]int),
 			lock: new(sync.Mutex),
 		},
 		stateValues: &stateValues{
-			vals:    make(map[int]map[string]float64),
-			horizon: config.Horizon,
-			lock:    new(sync.Mutex),
+			vals: make(map[int]map[string]float64),
+			lock: new(sync.Mutex),
 		},
 	}
 }
 
-func (e *ExplorationState) NextAction(step int, state State, actions []*strategies.Action) *strategies.Action {
+func (e *UCBZeroState) NextAction(step int, state State, actions []*strategies.Action) *strategies.Action {
 	return e.qValues.NextAction(step, state, actions)
 }
 
-func (e *ExplorationState) Update(step int, curState State, nextAction *strategies.Action, nextState State) bool {
+func (e *UCBZeroState) Update(step int, curState State, nextAction *strategies.Action, nextState State) bool {
 	curVisits := e.visitCount.Get(step, curState, nextAction)
 	e.visitCount.Incr(step, curState, nextAction)
 
@@ -105,9 +104,9 @@ func (e *ExplorationState) Update(step int, curState State, nextAction *strategi
 }
 
 type qValues struct {
-	vals    map[int]map[string]map[string]float64
-	horizon int
-	lock    *sync.Mutex
+	vals          map[int]map[string]map[string]float64
+	defaultQValue float64
+	lock          *sync.Mutex
 }
 
 func (q *qValues) init(step int, state State, action *strategies.Action) {
@@ -126,7 +125,7 @@ func (q *qValues) init(step int, state State, action *strategies.Action) {
 
 	_, ok = q.vals[step][stateKey][action.Name]
 	if !ok {
-		q.vals[step][stateKey][action.Name] = float64(q.horizon)
+		q.vals[step][stateKey][action.Name] = float64(q.defaultQValue)
 	}
 }
 
@@ -149,8 +148,8 @@ func (q *qValues) NextAction(step int, state State, actions []*strategies.Action
 	actionsMap := make(map[string]*strategies.Action)
 	for i, a := range actions {
 		if _, ok := q.vals[step][stateKey][a.Name]; !ok {
-			q.vals[step][stateKey][a.Name] = float64(q.horizon)
-			max = float64(q.horizon)
+			q.vals[step][stateKey][a.Name] = float64(q.defaultQValue)
+			max = float64(q.defaultQValue)
 			maxAction = a.Name
 		}
 		if i == 0 {
@@ -193,16 +192,16 @@ func (q *qValues) MaxValue(step int, state State) float64 {
 	if !ok {
 		q.vals[step] = make(map[string]map[string]float64)
 		q.vals[step][stateKey] = make(map[string]float64)
-		return float64(q.horizon)
+		return float64(q.defaultQValue)
 	}
 	_, ok = q.vals[step][stateKey]
 	if !ok {
 		q.vals[step][stateKey] = make(map[string]float64)
-		return float64(q.horizon)
+		return float64(q.defaultQValue)
 	}
 
 	if len(q.vals[step][stateKey]) == 0 {
-		return float64(q.horizon)
+		return float64(q.defaultQValue)
 	}
 
 	max := float64(math.MinInt)
@@ -256,9 +255,8 @@ func (v *visitCount) Incr(step int, state State, action *strategies.Action) {
 }
 
 type stateValues struct {
-	vals    map[int]map[string]float64
-	horizon int
-	lock    *sync.Mutex
+	vals map[int]map[string]float64
+	lock *sync.Mutex
 }
 
 func (s *stateValues) Update(step int, state State, val float64) bool {
