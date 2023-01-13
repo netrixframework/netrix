@@ -3,8 +3,6 @@ package rl
 import (
 	"math"
 	"sync"
-
-	"github.com/netrixframework/netrix/strategies"
 )
 
 type UCBZeroPolicyConfig struct {
@@ -30,12 +28,12 @@ func NewUCBZeroPolicy(config *UCBZeroPolicyConfig) *UCBZeroPolicy {
 	}
 }
 
-func (e *UCBZeroPolicy) NextAction(step int, state State, actions []*strategies.Action) (*strategies.Action, bool) {
+func (e *UCBZeroPolicy) NextAction(step int, state State, actions []*Action) (*Action, bool) {
 	a := e.state.NextAction(step, state, actions)
 	return a, a != nil
 }
 
-func (e *UCBZeroPolicy) Update(step int, state State, action *strategies.Action, nextState State) {
+func (e *UCBZeroPolicy) Update(step int, state State, action *Action, nextState State) {
 	e.state.Update(step, state, action, nextState)
 }
 
@@ -79,17 +77,20 @@ func NewUCBZeroState(config *UCBZeroPolicyConfig) *UCBZeroState {
 	}
 }
 
-func (e *UCBZeroState) NextAction(step int, state State, actions []*strategies.Action) *strategies.Action {
+func (e *UCBZeroState) NextAction(step int, state State, actions []*Action) *Action {
 	return e.qValues.NextAction(step, state, actions)
 }
 
-func (e *UCBZeroState) Update(step int, curState State, nextAction *strategies.Action, nextState State) bool {
+func (e *UCBZeroState) Update(step int, curState State, nextAction *Action, nextState State) bool {
 	curVisits := e.visitCount.Get(step, curState, nextAction)
 	e.visitCount.Incr(step, curState, nextAction)
 
 	nextStateValue := e.qValues.MaxValue(step+1, nextState)
 	if nextStateValue > float64(e.config.Horizon) {
 		nextStateValue = float64(e.config.Horizon)
+	}
+	if step == e.config.Horizon {
+		nextStateValue = 0.0
 	}
 	new := e.stateValues.Update(step+1, nextState, nextStateValue)
 
@@ -109,10 +110,11 @@ type qValues struct {
 	lock          *sync.Mutex
 }
 
-func (q *qValues) init(step int, state State, action *strategies.Action) {
+func (q *qValues) init(step int, state State, action *Action) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 	stateKey := state.Hash()
+	actionKey := action.Name()
 	_, ok := q.vals[step]
 	if !ok {
 		q.vals[step] = make(map[string]map[string]float64)
@@ -123,13 +125,13 @@ func (q *qValues) init(step int, state State, action *strategies.Action) {
 		q.vals[step][stateKey] = make(map[string]float64)
 	}
 
-	_, ok = q.vals[step][stateKey][action.Name]
+	_, ok = q.vals[step][stateKey][actionKey]
 	if !ok {
-		q.vals[step][stateKey][action.Name] = float64(q.defaultQValue)
+		q.vals[step][stateKey][actionKey] = float64(q.defaultQValue)
 	}
 }
 
-func (q *qValues) NextAction(step int, state State, actions []*strategies.Action) *strategies.Action {
+func (q *qValues) NextAction(step int, state State, actions []*Action) *Action {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
@@ -145,18 +147,19 @@ func (q *qValues) NextAction(step int, state State, actions []*strategies.Action
 
 	var max float64
 	var maxAction string
-	actionsMap := make(map[string]*strategies.Action)
+	actionsMap := make(map[string]*Action)
 	for i, a := range actions {
-		if _, ok := q.vals[step][stateKey][a.Name]; !ok {
-			q.vals[step][stateKey][a.Name] = float64(q.defaultQValue)
+		actionKey := a.Name()
+		if _, ok := q.vals[step][stateKey][actionKey]; !ok {
+			q.vals[step][stateKey][actionKey] = float64(q.defaultQValue)
 			max = float64(q.defaultQValue)
-			maxAction = a.Name
+			maxAction = actionKey
 		}
 		if i == 0 {
-			max = q.vals[step][stateKey][a.Name]
-			maxAction = a.Name
+			max = q.vals[step][stateKey][actionKey]
+			maxAction = actionKey
 		}
-		actionsMap[a.Name] = a
+		actionsMap[actionKey] = a
 	}
 
 	for action, v := range q.vals[step][stateKey] {
@@ -168,18 +171,18 @@ func (q *qValues) NextAction(step int, state State, actions []*strategies.Action
 	return actionsMap[maxAction]
 }
 
-func (q *qValues) Get(step int, state State, action *strategies.Action) float64 {
+func (q *qValues) Get(step int, state State, action *Action) float64 {
 	q.init(step, state, action)
 	q.lock.Lock()
 	defer q.lock.Unlock()
-	return q.vals[step][state.Hash()][action.Name]
+	return q.vals[step][state.Hash()][action.Name()]
 }
 
-func (q *qValues) Update(step int, state State, action *strategies.Action, val float64) {
+func (q *qValues) Update(step int, state State, action *Action, val float64) {
 	q.init(step, state, action)
 	q.lock.Lock()
 	defer q.lock.Unlock()
-	q.vals[step][state.Hash()][action.Name] = val
+	q.vals[step][state.Hash()][action.Name()] = val
 }
 
 func (q *qValues) MaxValue(step int, state State) float64 {
@@ -218,11 +221,12 @@ type visitCount struct {
 	lock *sync.Mutex
 }
 
-func (v *visitCount) Get(step int, state State, action *strategies.Action) int {
+func (v *visitCount) Get(step int, state State, action *Action) int {
 	v.lock.Lock()
 	defer v.lock.Unlock()
 
 	stateKey := state.Hash()
+	actionKey := action.Name()
 
 	if _, ok := v.vals[step]; !ok {
 		v.vals[step] = make(map[string]map[string]int)
@@ -230,28 +234,29 @@ func (v *visitCount) Get(step int, state State, action *strategies.Action) int {
 	if _, ok := v.vals[step][stateKey]; !ok {
 		v.vals[step][stateKey] = make(map[string]int)
 	}
-	val, ok := v.vals[step][stateKey][action.Name]
+	val, ok := v.vals[step][stateKey][actionKey]
 	if !ok {
-		v.vals[step][stateKey][action.Name] = 0
+		v.vals[step][stateKey][actionKey] = 0
 		return 0
 	}
 	return val
 }
 
-func (v *visitCount) Incr(step int, state State, action *strategies.Action) {
+func (v *visitCount) Incr(step int, state State, action *Action) {
 	if _, ok := v.vals[step]; !ok {
 		v.vals[step] = make(map[string]map[string]int)
 	}
 	stateKey := state.Hash()
+	actionKey := action.Name()
 	if _, ok := v.vals[step][stateKey]; !ok {
 		v.vals[step][stateKey] = make(map[string]int)
 	}
-	cur, ok := v.vals[step][stateKey][action.Name]
+	cur, ok := v.vals[step][stateKey][actionKey]
 	if !ok {
-		v.vals[step][stateKey][action.Name] = 1
+		v.vals[step][stateKey][actionKey] = 1
 		return
 	}
-	v.vals[step][stateKey][action.Name] = cur + 1
+	v.vals[step][stateKey][actionKey] = cur + 1
 }
 
 type stateValues struct {

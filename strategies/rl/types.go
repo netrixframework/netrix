@@ -1,18 +1,51 @@
 package rl
 
 import (
+	"fmt"
+	"hash/crc32"
+
 	"github.com/netrixframework/netrix/strategies"
 	"github.com/netrixframework/netrix/types"
 )
 
 type State interface {
 	Hash() string
-	Actions() []*strategies.Action
+}
+
+type Action struct {
+	Type    string
+	message *types.Message
+	replica types.ReplicaID
+}
+
+func (a *Action) Name() string {
+	switch a.Type {
+	case "DeliverMessage":
+		return fmt.Sprintf("%s_%s_%s", a.message.From, a.message.To, a.message.Repr)
+	case "TimeoutReplica":
+		return fmt.Sprintf("Timeout_%s", a.replica)
+	default:
+		return ""
+	}
+}
+
+func DeliverMessageAction(message *types.Message) *Action {
+	return &Action{
+		Type:    "DeliverMessage",
+		message: message,
+	}
+}
+
+func TimeoutReplica(replica types.ReplicaID) *Action {
+	return &Action{
+		Type:    "TimeoutReplica",
+		replica: replica,
+	}
 }
 
 type Policy interface {
-	NextAction(int, State, []*strategies.Action) (*strategies.Action, bool)
-	Update(int, State, *strategies.Action, State)
+	NextAction(int, State, []*Action) (*Action, bool)
+	Update(int, State, *Action, State)
 	NextIteration(int, *Trace)
 }
 
@@ -23,28 +56,28 @@ type Interpreter interface {
 }
 
 type Trace struct {
-	StateSequence  *types.List[State]
-	ActionSequence *types.List[*strategies.Action]
+	stateSequence  *types.List[*wrappedState]
+	actionSequence *types.List[*Action]
 }
 
 func NewTrace() *Trace {
 	return &Trace{
-		StateSequence:  types.NewEmptyList[State](),
-		ActionSequence: types.NewEmptyList[*strategies.Action](),
+		stateSequence:  types.NewEmptyList[*wrappedState](),
+		actionSequence: types.NewEmptyList[*Action](),
 	}
 }
 
-func (t *Trace) Add(state State, action *strategies.Action) {
-	t.StateSequence.Append(state)
-	t.ActionSequence.Append(action)
+func (t *Trace) Add(state *wrappedState, action *Action) {
+	t.stateSequence.Append(state)
+	t.actionSequence.Append(action)
 }
 
-func (t *Trace) Get(i int) (State, *strategies.Action, bool) {
-	state, ok := t.StateSequence.Elem(i)
+func (t *Trace) Get(i int) (State, *Action, bool) {
+	state, ok := t.stateSequence.Elem(i)
 	if !ok {
 		return nil, nil, false
 	}
-	action, ok := t.ActionSequence.Elem(i)
+	action, ok := t.actionSequence.Elem(i)
 	if !ok {
 		return nil, nil, false
 	}
@@ -52,10 +85,40 @@ func (t *Trace) Get(i int) (State, *strategies.Action, bool) {
 }
 
 func (t *Trace) Length() int {
-	return t.StateSequence.Size()
+	return t.stateSequence.Size()
 }
 
 func (t *Trace) Reset() {
-	t.StateSequence.RemoveAll()
-	t.ActionSequence.RemoveAll()
+	t.stateSequence.RemoveAll()
+	t.actionSequence.RemoveAll()
+}
+
+func (t *Trace) Hash() string {
+	hasher := crc32.New(crc32.MakeTable(crc32.IEEE))
+
+	traceStr := "["
+	for i := 0; i < t.stateSequence.Size(); i++ {
+		state, _ := t.stateSequence.Elem(i)
+		action, _ := t.actionSequence.Elem(i)
+		traceStr += fmt.Sprintf("(%s, %s),", state.Hash(), action.Name())
+	}
+	traceStr = traceStr[0 : len(traceStr)-1]
+	traceStr += "]"
+
+	return string(hasher.Sum([]byte(traceStr)))
+}
+
+func (t *Trace) unwrappedHash() string {
+	hasher := crc32.New(crc32.MakeTable(crc32.IEEE))
+
+	traceStr := "["
+	for i := 0; i < t.stateSequence.Size(); i++ {
+		state, _ := t.stateSequence.Elem(i)
+		action, _ := t.actionSequence.Elem(i)
+		traceStr += fmt.Sprintf("(%s, %s),", state.State.Hash(), action.Name())
+	}
+	traceStr = traceStr[0 : len(traceStr)-1]
+	traceStr += "]"
+
+	return string(hasher.Sum([]byte(traceStr)))
 }

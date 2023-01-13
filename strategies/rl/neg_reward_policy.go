@@ -4,7 +4,6 @@ import (
 	"math"
 	"sync"
 
-	"github.com/netrixframework/netrix/strategies"
 	"gonum.org/v1/gonum/stat/sampleuv"
 )
 
@@ -26,7 +25,7 @@ func NewNegativeRewardPolicy(alpha, gamma float64) *NegativeRewardPolicy {
 
 var _ Policy = &NegativeRewardPolicy{}
 
-func (n *NegativeRewardPolicy) NextAction(step int, state State, actions []*strategies.Action) (*strategies.Action, bool) {
+func (n *NegativeRewardPolicy) NextAction(step int, state State, actions []*Action) (*Action, bool) {
 	stateHash := state.Hash()
 
 	n.lock.Lock()
@@ -36,8 +35,9 @@ func (n *NegativeRewardPolicy) NextAction(step int, state State, actions []*stra
 	}
 
 	for _, a := range actions {
-		if _, ok := n.qmap[stateHash][a.Name]; !ok {
-			n.qmap[stateHash][a.Name] = 0
+		aName := a.Name()
+		if _, ok := n.qmap[stateHash][aName]; !ok {
+			n.qmap[stateHash][aName] = 0
 		}
 	}
 
@@ -46,7 +46,7 @@ func (n *NegativeRewardPolicy) NextAction(step int, state State, actions []*stra
 	vals := make([]float64, len(actions))
 
 	for i, action := range actions {
-		val := n.qmap[stateHash][action.Name]
+		val := n.qmap[stateHash][action.Name()]
 		exp := math.Exp(val)
 		vals[i] = exp
 		sum += exp
@@ -62,7 +62,7 @@ func (n *NegativeRewardPolicy) NextAction(step int, state State, actions []*stra
 	return actions[i], true
 }
 
-func (n *NegativeRewardPolicy) Update(_ int, _ State, _ *strategies.Action, _ State) {
+func (n *NegativeRewardPolicy) Update(_ int, _ State, _ *Action, _ State) {
 
 }
 
@@ -76,13 +76,14 @@ func (n *NegativeRewardPolicy) NextIteration(iteration int, trace *Trace) {
 			continue
 		}
 		stateHash := state.Hash()
+		actionKey := action.Name()
 		if _, ok := n.qmap[stateHash]; !ok {
 			continue
 		}
-		if _, ok := n.qmap[stateHash][action.Name]; !ok {
+		if _, ok := n.qmap[stateHash][actionKey]; !ok {
 			continue
 		}
-		curVal := n.qmap[stateHash][action.Name]
+		curVal := n.qmap[stateHash][actionKey]
 		max := float64(0)
 		for _, val := range n.qmap[stateHash] {
 			if val > max {
@@ -90,6 +91,6 @@ func (n *NegativeRewardPolicy) NextIteration(iteration int, trace *Trace) {
 			}
 		}
 		nextVal := (1-n.Alpha)*curVal + n.Alpha*(-1+n.Gamma*max)
-		n.qmap[stateHash][action.Name] = nextVal
+		n.qmap[stateHash][actionKey] = nextVal
 	}
 }

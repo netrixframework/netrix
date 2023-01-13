@@ -4,8 +4,6 @@ import (
 	"errors"
 	"math/rand"
 	"time"
-
-	"github.com/netrixframework/netrix/strategies"
 )
 
 var ErrInvalidEpsilon = errors.New("invalid epsilon value")
@@ -34,7 +32,7 @@ func NewUCBZeroEGreedyPolicy(config *UCBZeroEGreedyPolicyConfig) (*UCBZeroEGreed
 	}, nil
 }
 
-func (u *UCBZeroEGreedyPolicy) NextAction(step int, state State, actions []*strategies.Action) (*strategies.Action, bool) {
+func (u *UCBZeroEGreedyPolicy) NextAction(step int, state State, actions []*Action) (*Action, bool) {
 	if u.rand.Float64() > u.Epsilon {
 		return u.UCBZeroPolicy.NextAction(step, state, actions)
 	}

@@ -3,7 +3,6 @@ package rl
 import (
 	"fmt"
 
-	"github.com/netrixframework/netrix/strategies"
 	"github.com/netrixframework/netrix/types"
 )
 
@@ -24,10 +23,10 @@ func (w *wrappedState) Hash() string {
 	return out
 }
 
-func (w *wrappedState) Actions() []*strategies.Action {
-	actions := make([]*strategies.Action, len(w.pendingMessages))
+func (w *wrappedState) Actions() []*Action {
+	actions := make([]*Action, len(w.pendingMessages))
 	for i, m := range w.pendingMessages {
-		actions[i] = strategies.DeliverMessage(m)
+		actions[i] = DeliverMessageAction(m)
 	}
 	return actions
 }

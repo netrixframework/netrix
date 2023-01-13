@@ -12,6 +12,7 @@ type RLStrategyConfig struct {
 	Interpreter       Interpreter
 	Policy            Policy
 	AgentTickDuration time.Duration
+	MetricsPath       string
 }
 
 type RLStrategy struct {
@@ -129,10 +130,11 @@ func (r *RLStrategy) agentLoop() {
 	}
 }
 
-func (r *RLStrategy) doAction(a *strategies.Action) {
-	ch := make(chan struct{})
-	r.pendingActions.Add(types.MessageID(a.Name), ch)
-	r.actions.BlockingAdd(a)
+func (r *RLStrategy) doAction(a *Action) {
+	// TODO: fill this up
+	// ch := make(chan struct{})
+	// r.pendingActions.Add(types.MessageID(a.Name), ch)
+	// r.actions.BlockingAdd(a)
 
-	<-ch
+	// <-ch
 }
