@@ -1,11 +1,18 @@
 package rl
 
 import (
+	"crypto/sha256"
 	"fmt"
-	"hash/crc32"
 
 	"github.com/netrixframework/netrix/strategies"
 	"github.com/netrixframework/netrix/types"
+)
+
+type ActionType string
+
+var (
+	DeliverMessage ActionType = "DeliverMessage"
+	TimeoutReplica ActionType = "TimeoutReplica"
 )
 
 type State interface {
@@ -13,16 +20,16 @@ type State interface {
 }
 
 type Action struct {
-	Type    string
+	Type    ActionType
 	message *types.Message
 	replica types.ReplicaID
 }
 
 func (a *Action) Name() string {
 	switch a.Type {
-	case "DeliverMessage":
-		return fmt.Sprintf("%s_%s_%s", a.message.From, a.message.To, a.message.Repr)
-	case "TimeoutReplica":
+	case DeliverMessage:
+		return a.message.Name()
+	case TimeoutReplica:
 		return fmt.Sprintf("Timeout_%s", a.replica)
 	default:
 		return ""
@@ -31,14 +38,14 @@ func (a *Action) Name() string {
 
 func DeliverMessageAction(message *types.Message) *Action {
 	return &Action{
-		Type:    "DeliverMessage",
+		Type:    DeliverMessage,
 		message: message,
 	}
 }
 
-func TimeoutReplica(replica types.ReplicaID) *Action {
+func TimeoutReplicaAction(replica types.ReplicaID) *Action {
 	return &Action{
-		Type:    "TimeoutReplica",
+		Type:    TimeoutReplica,
 		replica: replica,
 	}
 }
@@ -94,7 +101,6 @@ func (t *Trace) Reset() {
 }
 
 func (t *Trace) Hash() string {
-	hasher := crc32.New(crc32.MakeTable(crc32.IEEE))
 
 	traceStr := "["
 	for i := 0; i < t.stateSequence.Size(); i++ {
@@ -105,20 +111,21 @@ func (t *Trace) Hash() string {
 	traceStr = traceStr[0 : len(traceStr)-1]
 	traceStr += "]"
 
-	return string(hasher.Sum([]byte(traceStr)))
+	hash := sha256.Sum256([]byte(traceStr))
+	return string(hash[:])
 }
 
 func (t *Trace) unwrappedHash() string {
-	hasher := crc32.New(crc32.MakeTable(crc32.IEEE))
 
 	traceStr := "["
 	for i := 0; i < t.stateSequence.Size(); i++ {
 		state, _ := t.stateSequence.Elem(i)
 		action, _ := t.actionSequence.Elem(i)
-		traceStr += fmt.Sprintf("(%s, %s),", state.State.Hash(), action.Name())
+		traceStr += fmt.Sprintf("(%s, %s),", state.InterpreterState.Hash(), action.Name())
 	}
 	traceStr = traceStr[0 : len(traceStr)-1]
 	traceStr += "]"
 
-	return string(hasher.Sum([]byte(traceStr)))
+	hash := sha256.Sum256([]byte(traceStr))
+	return string(hash[:])
 }

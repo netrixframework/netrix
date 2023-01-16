@@ -68,3 +68,9 @@ func (m *Message) Parse(parser MessageParser) error {
 	m.Repr = p.String()
 	return nil
 }
+
+// Name returns a formatted string containing from, to and repr
+// Name is not unique for every message, use ID for that purpose
+func (m *Message) Name() string {
+	return fmt.Sprintf("%s_%s_%s", m.From, m.To, m.Repr)
+}

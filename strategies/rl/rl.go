@@ -22,16 +22,20 @@ type RLStrategy struct {
 	actions     *types.Channel[*strategies.Action]
 	policy      Policy
 
-	pendingMessages *types.Map[types.MessageID, *types.Message]
-	pendingActions  *types.Map[types.MessageID, chan struct{}]
-	agentTicker     *time.Ticker
-
-	trace         *Trace
-	stepCount     int
-	stepCountLock *sync.Mutex
+	pendingMessages    *types.Map[types.MessageID, *types.Message]
+	pendingActions     map[types.MessageID]chan struct{}
+	pendingActionsLock *sync.Mutex
+	agentTicker        *time.Ticker
+	metrics            *Metrics
+	stepCount          int
+	stepCountLock      *sync.Mutex
 }
 
-func NewRLStrategy(config *RLStrategyConfig) *RLStrategy {
+func NewRLStrategy(config *RLStrategyConfig) (*RLStrategy, error) {
+	metrics, err := NewMetrics(config.MetricsPath)
+	if err != nil {
+		return nil, err
+	}
 	return &RLStrategy{
 		BaseService: types.NewBaseService("RLExploration", nil),
 		config:      config,
@@ -39,13 +43,14 @@ func NewRLStrategy(config *RLStrategyConfig) *RLStrategy {
 		policy:      config.Policy,
 		actions:     types.NewChannel[*strategies.Action](),
 
-		pendingMessages: types.NewMap[types.MessageID, *types.Message](),
-		pendingActions:  types.NewMap[types.MessageID, chan struct{}](),
-		agentTicker:     time.NewTicker(config.AgentTickDuration),
-		trace:           NewTrace(),
-		stepCount:       0,
-		stepCountLock:   new(sync.Mutex),
-	}
+		pendingMessages:    types.NewMap[types.MessageID, *types.Message](),
+		pendingActions:     make(map[types.MessageID]chan struct{}),
+		pendingActionsLock: new(sync.Mutex),
+		agentTicker:        time.NewTicker(config.AgentTickDuration),
+		metrics:            metrics,
+		stepCount:          0,
+		stepCountLock:      new(sync.Mutex),
+	}, nil
 }
 
 var _ strategies.Strategy = &RLStrategy{}
@@ -63,10 +68,12 @@ func (r *RLStrategy) Step(e *types.Event, ctx *strategies.Context) {
 	} else if e.IsMessageReceive() {
 		if message, ok := ctx.GetMessage(e); ok {
 			r.pendingMessages.Remove(message.ID)
-			if ch, ok := r.pendingActions.Get(message.ID); ok {
+			r.pendingActionsLock.Lock()
+			if ch, ok := r.pendingActions[message.ID]; ok {
 				close(ch)
-				r.pendingActions.Remove(message.ID)
+				delete(r.pendingActions, message.ID)
 			}
+			r.pendingActionsLock.Unlock()
 		}
 	}
 	r.interpreter.Update(e, ctx)
@@ -77,13 +84,18 @@ func (r *RLStrategy) EndCurIteration(ctx *strategies.Context) {
 
 func (r *RLStrategy) NextIteration(ctx *strategies.Context) {
 	r.interpreter.Reset()
-	r.policy.NextIteration(ctx.CurIteration(), r.trace)
-	r.trace.Reset()
+	r.policy.NextIteration(ctx.CurIteration(), r.metrics.Trace)
+	r.metrics.NextIteration()
 	r.stepCountLock.Lock()
 	r.stepCount = 0
 	r.stepCountLock.Unlock()
 	r.pendingMessages.RemoveAll()
-	r.pendingActions.RemoveAll()
+	r.pendingActionsLock.Lock()
+	for _, ch := range r.pendingActions {
+		close(ch)
+	}
+	r.pendingActions = make(map[types.MessageID]chan struct{})
+	r.pendingActionsLock.Unlock()
 }
 
 func (r *RLStrategy) Finalize(ctx *strategies.Context) {
@@ -125,16 +137,32 @@ func (r *RLStrategy) agentLoop() {
 			// TODO: move the select (waiting) here
 			nextState := r.wrapState(r.interpreter.CurState())
 			r.policy.Update(step, state, action, nextState)
-			r.trace.Add(state, action)
+			r.metrics.Update(step, state, action)
 		}
 	}
 }
 
 func (r *RLStrategy) doAction(a *Action) {
-	// TODO: fill this up
-	// ch := make(chan struct{})
-	// r.pendingActions.Add(types.MessageID(a.Name), ch)
-	// r.actions.BlockingAdd(a)
-
-	// <-ch
+	switch a.Type {
+	case TimeoutReplica:
+		for _, m := range r.pendingMessages.IterValues() {
+			if m.To == a.replica || m.From == a.replica {
+				r.pendingMessages.Remove(m.ID)
+			}
+		}
+	case DeliverMessage:
+		ch := make(chan struct{})
+		r.pendingActionsLock.Lock()
+		if existingCh, ok := r.pendingActions[a.message.ID]; ok {
+			close(ch)
+			ch = existingCh
+		} else {
+			r.pendingActions[a.message.ID] = ch
+		}
+		r.pendingActionsLock.Unlock()
+		r.actions.BlockingAdd(
+			strategies.DeliverMessage(a.message),
+		)
+		<-ch
+	}
 }

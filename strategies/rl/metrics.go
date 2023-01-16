@@ -49,7 +49,7 @@ func (m *Metrics) Update(step int, state *wrappedState, action *Action) {
 	m.Trace.Add(state, action)
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	interpreterStateHash := state.State.Hash()
+	interpreterStateHash := state.InterpreterState.Hash()
 	stateHash := state.Hash()
 	if _, ok := m.interpreterStates[interpreterStateHash]; !ok {
 		m.interpreterStates[interpreterStateHash] = 0

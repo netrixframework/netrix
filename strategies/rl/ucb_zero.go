@@ -110,11 +110,7 @@ type qValues struct {
 	lock          *sync.Mutex
 }
 
-func (q *qValues) init(step int, state State, action *Action) {
-	q.lock.Lock()
-	defer q.lock.Unlock()
-	stateKey := state.Hash()
-	actionKey := action.Name()
+func (q *qValues) init(step int, stateKey, actionKey string) {
 	_, ok := q.vals[step]
 	if !ok {
 		q.vals[step] = make(map[string]map[string]float64)
@@ -172,17 +168,21 @@ func (q *qValues) NextAction(step int, state State, actions []*Action) *Action {
 }
 
 func (q *qValues) Get(step int, state State, action *Action) float64 {
-	q.init(step, state, action)
 	q.lock.Lock()
 	defer q.lock.Unlock()
-	return q.vals[step][state.Hash()][action.Name()]
+	stateKey := state.Hash()
+	actionKey := action.Name()
+	q.init(step, stateKey, actionKey)
+	return q.vals[step][stateKey][actionKey]
 }
 
 func (q *qValues) Update(step int, state State, action *Action, val float64) {
-	q.init(step, state, action)
 	q.lock.Lock()
 	defer q.lock.Unlock()
-	q.vals[step][state.Hash()][action.Name()] = val
+	stateKey := state.Hash()
+	actionKey := action.Name()
+	q.init(step, stateKey, actionKey)
+	q.vals[step][stateKey][actionKey] = val
 }
 
 func (q *qValues) MaxValue(step int, state State) float64 {

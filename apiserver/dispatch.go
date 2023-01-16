@@ -81,6 +81,7 @@ func (a *APIServer) SendMessage(msg *types.Message) error {
 	a.Logger.With(log.LogParams{
 		"resp": resp,
 		"to":   replica.ID,
+		"id":   msg.ID,
 		"addr": replica.Addr,
 		"data": string(bytes),
 	}).Debug("Dispatched message to replica")
