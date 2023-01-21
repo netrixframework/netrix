@@ -13,6 +13,7 @@ type RLStrategyConfig struct {
 	Policy            Policy
 	AgentTickDuration time.Duration
 	MetricsPath       string
+	AllowTimeouts     bool
 }
 
 type RLStrategy struct {
@@ -21,6 +22,7 @@ type RLStrategy struct {
 	interpreter Interpreter
 	actions     *types.Channel[*strategies.Action]
 	policy      Policy
+	replicas    map[types.ReplicaID]bool
 
 	pendingMessages    *types.Map[types.MessageID, *types.Message]
 	pendingActions     map[types.MessageID]chan struct{}
@@ -42,6 +44,7 @@ func NewRLStrategy(config *RLStrategyConfig) (*RLStrategy, error) {
 		interpreter: config.Interpreter,
 		policy:      config.Policy,
 		actions:     types.NewChannel[*strategies.Action](),
+		replicas:    make(map[types.ReplicaID]bool),
 
 		pendingMessages:    types.NewMap[types.MessageID, *types.Message](),
 		pendingActions:     make(map[types.MessageID]chan struct{}),

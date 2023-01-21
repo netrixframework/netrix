@@ -2,6 +2,7 @@ package rl
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/netrixframework/netrix/types"
@@ -13,16 +14,21 @@ type wrappedState struct {
 }
 
 func (w *wrappedState) Hash() string {
-	out := fmt.Sprintf("state:{%s},messages:{", w.InterpreterState.Hash())
+	out := w.String()
+	hash := sha256.Sum256([]byte(out))
+	return hex.EncodeToString(hash[:])
+}
+
+func (w *wrappedState) String() string {
+	out := fmt.Sprintf("{state:%s,messages:[", w.InterpreterState.Hash())
 	for i, m := range w.pendingMessages {
 		out += m.Name()
 		if i < len(w.pendingMessages)-1 {
 			out += ","
 		}
 	}
-	out += "}"
-	hash := sha256.Sum256([]byte(out))
-	return string(hash[:])
+	out += "]}"
+	return out
 }
 
 func (w *wrappedState) Actions() []*Action {

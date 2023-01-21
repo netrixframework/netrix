@@ -82,6 +82,8 @@ func (m *Metrics) NextIteration() {
 		UniqueWrapperStates:     len(m.wrapperStates),
 		UniqueInterpreterTraces: len(m.interpreterTraces),
 		UniqueWrappedTraces:     len(m.traces),
+		WrappedTrace:            m.Trace.Strings(),
+		InterpreterTrace:        m.Trace.unwrappedStrings(),
 	}
 	m.iteration += 1
 	m.lock.Unlock()
@@ -112,4 +114,6 @@ type iterationMetrics struct {
 	UniqueWrapperStates     int
 	UniqueInterpreterTraces int
 	UniqueWrappedTraces     int
+	WrappedTrace            []string
+	InterpreterTrace        []string
 }

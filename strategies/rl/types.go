@@ -2,6 +2,7 @@ package rl
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/netrixframework/netrix/strategies"
@@ -101,7 +102,6 @@ func (t *Trace) Reset() {
 }
 
 func (t *Trace) Hash() string {
-
 	traceStr := "["
 	for i := 0; i < t.stateSequence.Size(); i++ {
 		state, _ := t.stateSequence.Elem(i)
@@ -112,11 +112,10 @@ func (t *Trace) Hash() string {
 	traceStr += "]"
 
 	hash := sha256.Sum256([]byte(traceStr))
-	return string(hash[:])
+	return hex.EncodeToString(hash[:])
 }
 
 func (t *Trace) unwrappedHash() string {
-
 	traceStr := "["
 	for i := 0; i < t.stateSequence.Size(); i++ {
 		state, _ := t.stateSequence.Elem(i)
@@ -127,5 +126,25 @@ func (t *Trace) unwrappedHash() string {
 	traceStr += "]"
 
 	hash := sha256.Sum256([]byte(traceStr))
-	return string(hash[:])
+	return hex.EncodeToString(hash[:])
+}
+
+func (t *Trace) Strings() []string {
+	result := make([]string, t.stateSequence.Size())
+	for i := 0; i < t.stateSequence.Size(); i++ {
+		state, _ := t.stateSequence.Elem(i)
+		action, _ := t.actionSequence.Elem(i)
+		result[i] = fmt.Sprintf("{state:%s, action: %s}", state.String(), action.Name())
+	}
+	return result
+}
+
+func (t *Trace) unwrappedStrings() []string {
+	result := make([]string, t.stateSequence.Size())
+	for i := 0; i < t.stateSequence.Size(); i++ {
+		state, _ := t.stateSequence.Elem(i)
+		action, _ := t.actionSequence.Elem(i)
+		result[i] = fmt.Sprintf("(%s, %s)", state.InterpreterState.Hash(), action.Name())
+	}
+	return result
 }
