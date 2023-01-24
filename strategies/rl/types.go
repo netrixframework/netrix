@@ -3,6 +3,7 @@ package rl
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 
 	"github.com/netrixframework/netrix/strategies"
@@ -101,31 +102,41 @@ func (t *Trace) Reset() {
 	t.actionSequence.RemoveAll()
 }
 
+type traceEvent struct {
+	State  string
+	Action string
+}
+
 func (t *Trace) Hash() string {
-	traceStr := "["
+	events := make([]*traceEvent, t.stateSequence.Size())
 	for i := 0; i < t.stateSequence.Size(); i++ {
 		state, _ := t.stateSequence.Elem(i)
 		action, _ := t.actionSequence.Elem(i)
-		traceStr += fmt.Sprintf("(%s, %s),", state.Hash(), action.Name())
+		events[i] = &traceEvent{
+			State:  state.Hash(),
+			Action: action.Name(),
+		}
 	}
-	traceStr = traceStr[0 : len(traceStr)-1]
-	traceStr += "]"
+	b, _ := json.Marshal(events)
 
-	hash := sha256.Sum256([]byte(traceStr))
+	hash := sha256.Sum256(b)
 	return hex.EncodeToString(hash[:])
 }
 
 func (t *Trace) unwrappedHash() string {
-	traceStr := "["
+
+	events := make([]*traceEvent, t.stateSequence.Size())
 	for i := 0; i < t.stateSequence.Size(); i++ {
 		state, _ := t.stateSequence.Elem(i)
 		action, _ := t.actionSequence.Elem(i)
-		traceStr += fmt.Sprintf("(%s, %s),", state.InterpreterState.Hash(), action.Name())
+		events[i] = &traceEvent{
+			State:  state.InterpreterState.Hash(),
+			Action: action.Name(),
+		}
 	}
-	traceStr = traceStr[0 : len(traceStr)-1]
-	traceStr += "]"
+	b, _ := json.Marshal(events)
 
-	hash := sha256.Sum256([]byte(traceStr))
+	hash := sha256.Sum256(b)
 	return hex.EncodeToString(hash[:])
 }
 
@@ -134,7 +145,11 @@ func (t *Trace) Strings() []string {
 	for i := 0; i < t.stateSequence.Size(); i++ {
 		state, _ := t.stateSequence.Elem(i)
 		action, _ := t.actionSequence.Elem(i)
-		result[i] = fmt.Sprintf("{state:%s, action: %s}", state.String(), action.Name())
+		b, _ := json.Marshal(&traceEvent{
+			State:  state.String(),
+			Action: action.Name(),
+		})
+		result[i] = string(b)
 	}
 	return result
 }
@@ -144,7 +159,11 @@ func (t *Trace) unwrappedStrings() []string {
 	for i := 0; i < t.stateSequence.Size(); i++ {
 		state, _ := t.stateSequence.Elem(i)
 		action, _ := t.actionSequence.Elem(i)
-		result[i] = fmt.Sprintf("(%s, %s)", state.InterpreterState.Hash(), action.Name())
+		b, _ := json.Marshal(&traceEvent{
+			State:  state.InterpreterState.Hash(),
+			Action: action.Name(),
+		})
+		result[i] = string(b)
 	}
 	return result
 }

@@ -3,7 +3,8 @@ package rl
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
+	"encoding/json"
+	"sort"
 
 	"github.com/netrixframework/netrix/types"
 )
@@ -20,15 +21,25 @@ func (w *wrappedState) Hash() string {
 }
 
 func (w *wrappedState) String() string {
-	out := fmt.Sprintf("{state:%s,messages:[", w.InterpreterState.Hash())
-	for i, m := range w.pendingMessages {
-		out += m.Name()
-		if i < len(w.pendingMessages)-1 {
-			out += ","
+	actionsMap := make(map[string]bool)
+	actions := make([]string, 0)
+
+	for _, m := range w.pendingMessages {
+		mName := m.Name()
+		if _, ok := actionsMap[mName]; !ok {
+			actionsMap[mName] = true
+			actions = append(actions, mName)
 		}
 	}
-	out += "]}"
-	return out
+	sort.Strings(actions)
+	b, _ := json.Marshal(struct {
+		State    string
+		Messages []string
+	}{
+		State:    w.InterpreterState.Hash(),
+		Messages: actions,
+	})
+	return string(b)
 }
 
 func (w *wrappedState) Actions() []*Action {
