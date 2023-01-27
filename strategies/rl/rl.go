@@ -149,7 +149,7 @@ func (r *RLStrategy) doAction(a *Action) {
 	switch a.Type {
 	case TimeoutReplica:
 		for _, m := range r.pendingMessages.IterValues() {
-			if m.To == a.replica || m.From == a.replica {
+			if m.To == a.replica { //|| m.From == a.replica
 				r.pendingMessages.Remove(m.ID)
 			}
 		}

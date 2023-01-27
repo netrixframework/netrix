@@ -44,17 +44,22 @@ func (w *wrappedState) String() string {
 
 func (w *wrappedState) Actions() []*Action {
 	uniqueActions := make(map[string]*Action)
+	possibleTimeouts := make(map[types.ReplicaID]bool)
 	for _, m := range w.pendingMessages {
 		aName := m.Name()
 		if _, ok := uniqueActions[aName]; !ok {
 			uniqueActions[aName] = DeliverMessageAction(m)
 		}
+		if _, ok := possibleTimeouts[m.To]; !ok {
+			possibleTimeouts[m.To] = true
+		}
 	}
-	actions := make([]*Action, len(uniqueActions))
-	i := 0
+	actions := make([]*Action, 0)
 	for _, a := range uniqueActions {
-		actions[i] = a
-		i++
+		actions = append(actions, a)
+	}
+	for to := range possibleTimeouts {
+		actions = append(actions, TimeoutReplicaAction(to))
 	}
 	return actions
 }
