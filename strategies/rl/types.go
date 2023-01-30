@@ -108,8 +108,9 @@ type traceEvent struct {
 }
 
 func (t *Trace) Hash() string {
-	events := make([]*traceEvent, t.stateSequence.Size())
-	for i := 0; i < t.stateSequence.Size(); i++ {
+	len := t.stateSequence.Size()
+	events := make([]*traceEvent, len)
+	for i := 0; i < len; i++ {
 		state, _ := t.stateSequence.Elem(i)
 		action, _ := t.actionSequence.Elem(i)
 		events[i] = &traceEvent{
@@ -124,9 +125,9 @@ func (t *Trace) Hash() string {
 }
 
 func (t *Trace) unwrappedHash() string {
-
-	events := make([]*traceEvent, t.stateSequence.Size())
-	for i := 0; i < t.stateSequence.Size(); i++ {
+	len := t.stateSequence.Size()
+	events := make([]*traceEvent, len)
+	for i := 0; i < len; i++ {
 		state, _ := t.stateSequence.Elem(i)
 		action, _ := t.actionSequence.Elem(i)
 		events[i] = &traceEvent{
@@ -141,8 +142,9 @@ func (t *Trace) unwrappedHash() string {
 }
 
 func (t *Trace) Strings() []string {
-	result := make([]string, t.stateSequence.Size())
-	for i := 0; i < t.stateSequence.Size(); i++ {
+	len := t.stateSequence.Size()
+	result := make([]string, len)
+	for i := 0; i < len; i++ {
 		state, _ := t.stateSequence.Elem(i)
 		action, _ := t.actionSequence.Elem(i)
 		b, _ := json.Marshal(&traceEvent{
@@ -155,8 +157,9 @@ func (t *Trace) Strings() []string {
 }
 
 func (t *Trace) unwrappedStrings() []string {
-	result := make([]string, t.stateSequence.Size())
-	for i := 0; i < t.stateSequence.Size(); i++ {
+	len := t.stateSequence.Size()
+	result := make([]string, len)
+	for i := 0; i < len; i++ {
 		state, _ := t.stateSequence.Elem(i)
 		action, _ := t.actionSequence.Elem(i)
 		b, _ := json.Marshal(&traceEvent{

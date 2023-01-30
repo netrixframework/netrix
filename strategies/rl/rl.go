@@ -1,9 +1,11 @@
 package rl
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
+	"github.com/netrixframework/netrix/log"
 	"github.com/netrixframework/netrix/strategies"
 	"github.com/netrixframework/netrix/types"
 )
@@ -31,6 +33,9 @@ type RLStrategy struct {
 	metrics            *Metrics
 	stepCount          int
 	stepCountLock      *sync.Mutex
+
+	agentEnabled     bool
+	agentEnabledLock *sync.Mutex
 }
 
 func NewRLStrategy(config *RLStrategyConfig) (*RLStrategy, error) {
@@ -53,6 +58,8 @@ func NewRLStrategy(config *RLStrategyConfig) (*RLStrategy, error) {
 		metrics:            metrics,
 		stepCount:          0,
 		stepCountLock:      new(sync.Mutex),
+		agentEnabled:       false,
+		agentEnabledLock:   new(sync.Mutex),
 	}, nil
 }
 
@@ -83,6 +90,9 @@ func (r *RLStrategy) Step(e *types.Event, ctx *strategies.Context) {
 }
 
 func (r *RLStrategy) EndCurIteration(ctx *strategies.Context) {
+	r.agentEnabledLock.Lock()
+	r.agentEnabled = false
+	r.agentEnabledLock.Unlock()
 }
 
 func (r *RLStrategy) NextIteration(ctx *strategies.Context) {
@@ -99,9 +109,20 @@ func (r *RLStrategy) NextIteration(ctx *strategies.Context) {
 	}
 	r.pendingActions = make(map[types.MessageID]chan struct{})
 	r.pendingActionsLock.Unlock()
+	r.agentTicker.Reset(r.config.AgentTickDuration)
+
+	r.agentEnabledLock.Lock()
+	r.agentEnabled = true
+	r.agentEnabledLock.Unlock()
 }
 
 func (r *RLStrategy) Finalize(ctx *strategies.Context) {
+}
+
+func (r *RLStrategy) isAgentEnabled() bool {
+	r.agentEnabledLock.Lock()
+	defer r.agentEnabledLock.Unlock()
+	return r.agentEnabled
 }
 
 func (r *RLStrategy) Start() error {
@@ -112,6 +133,7 @@ func (r *RLStrategy) Start() error {
 
 func (r *RLStrategy) Stop() error {
 	r.BaseService.StopRunning()
+	r.agentTicker.Stop()
 	return nil
 }
 
@@ -123,10 +145,26 @@ func (r *RLStrategy) agentLoop() {
 		case <-r.QuitCh():
 			return
 		}
+		if !r.isAgentEnabled() {
+			continue
+		}
 		state := r.wrapState(r.interpreter.CurState())
 		possibleActions := state.Actions()
 		if len(possibleActions) == 0 {
 			continue
+		}
+		haveMessageAction := false
+		for _, a := range possibleActions {
+			if a.Type == DeliverMessage {
+				haveMessageAction = true
+				break
+			}
+		}
+		if haveMessageAction {
+			r.Logger.With(log.LogParams{
+				"state": fmt.Sprintf("%v", state.InterpreterState),
+				"hash":  state.InterpreterState.Hash(),
+			}).Debug("Stepping RL Agent, have message action")
 		}
 		r.stepCountLock.Lock()
 		step := r.stepCount
@@ -134,9 +172,22 @@ func (r *RLStrategy) agentLoop() {
 		action, ok := r.policy.NextAction(step, state, possibleActions)
 		if ok {
 			r.doAction(action)
+			movedOn := false
 			r.stepCountLock.Lock()
-			r.stepCount += 1
+			if r.stepCount == step {
+				r.stepCount += 1
+			} else {
+				movedOn = true
+			}
 			r.stepCountLock.Unlock()
+			if movedOn {
+				// The Agent has moved on to the next episode/iteration
+				// We do not update the policy or metrics
+
+				// Relying on the assumption that number of steps is >= 1
+				// in each episode/iteration
+				continue
+			}
 			// TODO: move the select (waiting) here
 			nextState := r.wrapState(r.interpreter.CurState())
 			r.policy.Update(step, state, action, nextState)

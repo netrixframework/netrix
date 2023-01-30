@@ -7,9 +7,9 @@ import (
 
 type UCBZeroPolicyConfig struct {
 	Horizon     int
-	StateSpace  int
+	StateSpace  float64
 	Iterations  int
-	ActionSpace int
+	ActionSpace float64
 	Probability float64
 	C           float64
 }

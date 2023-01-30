@@ -12,6 +12,7 @@ import (
 type wrappedState struct {
 	InterpreterState State
 	pendingMessages  []*types.Message
+	withTimeouts     bool
 }
 
 func (w *wrappedState) Hash() string {
@@ -58,8 +59,10 @@ func (w *wrappedState) Actions() []*Action {
 	for _, a := range uniqueActions {
 		actions = append(actions, a)
 	}
-	for to := range possibleTimeouts {
-		actions = append(actions, TimeoutReplicaAction(to))
+	if w.withTimeouts {
+		for to := range possibleTimeouts {
+			actions = append(actions, TimeoutReplicaAction(to))
+		}
 	}
 	return actions
 }
@@ -68,5 +71,6 @@ func (r *RLStrategy) wrapState(state State) *wrappedState {
 	return &wrappedState{
 		InterpreterState: state,
 		pendingMessages:  r.pendingMessages.IterValues(),
+		withTimeouts:     r.config.AllowTimeouts,
 	}
 }
