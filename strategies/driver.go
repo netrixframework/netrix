@@ -182,6 +182,7 @@ func (d *Driver) main() error {
 	if err := d.waitForReplicas(false); err != nil {
 		return err
 	}
+	d.Logger.Info(fmt.Sprintf("Running for %d iterations", d.config.Iterations))
 	d.strategyCtx = newContext(d.ctx)
 	for d.strategyCtx.CurIteration() < d.config.Iterations {
 		if err := d.waitForReplicas(true); err != nil {

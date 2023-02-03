@@ -2,6 +2,7 @@ package rl
 
 import (
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -15,7 +16,9 @@ type RLStrategyConfig struct {
 	Policy            Policy
 	AgentTickDuration time.Duration
 	MetricsPath       string
-	AllowTimeouts     bool
+	// TimeoutEpsilon configures how often we want to transition to a state with
+	// timeouts enabled (between 0 and 1). 0 indicates never and 1 indicates always.
+	TimeoutEpsilon float64
 }
 
 type RLStrategy struct {
@@ -26,22 +29,27 @@ type RLStrategy struct {
 	policy      Policy
 	replicas    map[types.ReplicaID]bool
 
-	pendingMessages    *types.Map[types.MessageID, *types.Message]
-	pendingActions     map[types.MessageID]chan struct{}
-	pendingActionsLock *sync.Mutex
-	agentTicker        *time.Ticker
-	metrics            *Metrics
-	stepCount          int
-	stepCountLock      *sync.Mutex
-
-	agentEnabled     bool
-	agentEnabledLock *sync.Mutex
+	pendingMessages     *types.Map[types.MessageID, *types.Message]
+	pendingActions      map[types.MessageID]chan struct{}
+	pendingActionsLock  *sync.Mutex
+	agentTicker         *time.Ticker
+	metrics             *Metrics
+	stepCount           int
+	stepCountLock       *sync.Mutex
+	agentEnabled        bool
+	agentEnabledLock    *sync.Mutex
+	timeoutRand         *rand.Rand
+	curTimeoutState     bool
+	curTimeoutStateLock *sync.Mutex
 }
 
 func NewRLStrategy(config *RLStrategyConfig) (*RLStrategy, error) {
 	metrics, err := NewMetrics(config.MetricsPath)
 	if err != nil {
 		return nil, err
+	}
+	if config.TimeoutEpsilon < 0 || config.TimeoutEpsilon > 1 {
+		return nil, fmt.Errorf("invalid time epsilon params")
 	}
 	return &RLStrategy{
 		BaseService: types.NewBaseService("RLExploration", nil),
@@ -51,15 +59,17 @@ func NewRLStrategy(config *RLStrategyConfig) (*RLStrategy, error) {
 		actions:     types.NewChannel[*strategies.Action](),
 		replicas:    make(map[types.ReplicaID]bool),
 
-		pendingMessages:    types.NewMap[types.MessageID, *types.Message](),
-		pendingActions:     make(map[types.MessageID]chan struct{}),
-		pendingActionsLock: new(sync.Mutex),
-		agentTicker:        time.NewTicker(config.AgentTickDuration),
-		metrics:            metrics,
-		stepCount:          0,
-		stepCountLock:      new(sync.Mutex),
-		agentEnabled:       false,
-		agentEnabledLock:   new(sync.Mutex),
+		pendingMessages:     types.NewMap[types.MessageID, *types.Message](),
+		pendingActions:      make(map[types.MessageID]chan struct{}),
+		pendingActionsLock:  new(sync.Mutex),
+		agentTicker:         time.NewTicker(config.AgentTickDuration),
+		metrics:             metrics,
+		stepCount:           0,
+		stepCountLock:       new(sync.Mutex),
+		agentEnabled:        false,
+		agentEnabledLock:    new(sync.Mutex),
+		curTimeoutState:     false,
+		curTimeoutStateLock: new(sync.Mutex),
 	}, nil
 }
 
@@ -127,6 +137,10 @@ func (r *RLStrategy) isAgentEnabled() bool {
 
 func (r *RLStrategy) Start() error {
 	r.BaseService.StartRunning()
+	r.Logger.With(log.LogParams{
+		"timeout_epsilon": r.config.TimeoutEpsilon,
+		"agent_tick_dur":  r.config.AgentTickDuration.String(),
+	}).Info("Starting RL strategy!")
 	go r.agentLoop()
 	return nil
 }
@@ -140,15 +154,10 @@ func (r *RLStrategy) Stop() error {
 // TODO: Abstract away the agent
 func (r *RLStrategy) agentLoop() {
 	for {
-		select {
-		case <-r.agentTicker.C:
-		case <-r.QuitCh():
-			return
-		}
 		if !r.isAgentEnabled() {
 			continue
 		}
-		state := r.wrapState(r.interpreter.CurState())
+		state := r.wrapState(r.interpreter.CurState(), false)
 		possibleActions := state.Actions()
 		if len(possibleActions) == 0 {
 			continue
@@ -188,8 +197,12 @@ func (r *RLStrategy) agentLoop() {
 				// in each episode/iteration
 				continue
 			}
-			// TODO: move the select (waiting) here
-			nextState := r.wrapState(r.interpreter.CurState())
+			select {
+			case <-r.agentTicker.C:
+			case <-r.QuitCh():
+				return
+			}
+			nextState := r.wrapState(r.interpreter.CurState(), true)
 			r.policy.Update(step, state, action, nextState)
 			r.metrics.Update(step, state, action)
 		}

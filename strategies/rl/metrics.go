@@ -75,9 +75,13 @@ func (m *Metrics) NextIteration() {
 	}
 	m.traces[wrappedTraceHash] += 1
 
+	interpreterStates := make(map[string]int)
+	for k, v := range m.interpreterStates {
+		interpreterStates[k] = v
+	}
 	toStore := &iterationMetrics{
 		Iteration:               m.iteration,
-		InterpreterStateVisits:  m.interpreterStates,
+		InterpreterStateVisits:  interpreterStates,
 		UniqueInterpreterStates: len(m.interpreterStates),
 		UniqueWrapperStates:     len(m.wrapperStates),
 		UniqueInterpreterTraces: len(m.interpreterTraces),

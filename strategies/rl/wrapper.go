@@ -67,10 +67,25 @@ func (w *wrappedState) Actions() []*Action {
 	return actions
 }
 
-func (r *RLStrategy) wrapState(state State) *wrappedState {
+func (r *RLStrategy) wrapState(state State, new bool) *wrappedState {
+	withTimeouts := false
+	if new {
+		// Toss a coin to decide and store the new state
+		if r.timeoutRand.Float64() < r.config.TimeoutEpsilon {
+			withTimeouts = true
+		}
+		r.curTimeoutStateLock.Lock()
+		r.curTimeoutState = withTimeouts
+		r.curTimeoutStateLock.Unlock()
+	} else {
+		// Use existing state
+		r.curTimeoutStateLock.Lock()
+		withTimeouts = r.curTimeoutState
+		r.curTimeoutStateLock.Unlock()
+	}
 	return &wrappedState{
 		InterpreterState: state,
 		pendingMessages:  r.pendingMessages.IterValues(),
-		withTimeouts:     r.config.AllowTimeouts,
+		withTimeouts:     withTimeouts,
 	}
 }
