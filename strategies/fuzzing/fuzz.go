@@ -34,10 +34,12 @@ type FuzzStrategy struct {
 	corpus       *types.Map[string, *Input]
 	uniqueStates *types.Map[string, State]
 
-	trace     *Trace
-	curInput  *Input
-	iteration int
-	lock      *sync.Mutex
+	replicaStore *types.ReplicaStore
+	trace        *Trace
+	curInput     *Input
+	iteration    int
+	fuzzEnabled  bool
+	lock         *sync.Mutex
 
 	mutator     Mutator
 	interpreter Interpreter
@@ -59,7 +61,10 @@ func NewFuzzStrategy(config *FuzzStrategyConfig) *FuzzStrategy {
 		config:       config,
 		trace:        NewTrace(),
 		iteration:    0,
+		fuzzEnabled:  false,
 		lock:         new(sync.Mutex),
+		curInput:     nil,
+		replicaStore: nil,
 	}
 }
 
@@ -68,11 +73,55 @@ func (f *FuzzStrategy) ActionsCh() *types.Channel[*strategies.Action] {
 }
 
 func (f *FuzzStrategy) EndCurIteration(ctx *strategies.Context) {
+	f.lock.Lock()
+	f.fuzzEnabled = false
+	f.lock.Unlock()
 
+	if f.trace.HaveNewState(f.uniqueStates) {
+		f.corpus.Add(f.curInput.Hash(), f.curInput)
+	}
+	for _, r := range f.mailBoxes.Keys() {
+		f.mailBoxes.Add(r, make([]*types.Message, 0))
+	}
+	f.trace.Reset()
+}
+
+func (f *FuzzStrategy) generateInput() {
+	if f.curInput == nil {
+		rand := rand.New(rand.NewSource(time.Now().UnixNano()))
+		// Generate new input
+		possibleActions := make([]Action, 0)
+		for _, r := range f.replicaStore.Iter() {
+			possibleActions = append(possibleActions, Action{
+				Type:    DeliverAction,
+				Process: r.ID,
+			}, Action{
+				Type:    DropAction,
+				Process: r.ID,
+			})
+		}
+
+		ip := make([]Action, f.config.Steps)
+		pLen := len(possibleActions)
+		for i := 0; i < f.config.Steps; i++ {
+			next := rand.Intn(pLen)
+			ip[i] = possibleActions[next]
+		}
+		f.curInput = (*Input)(&ip)
+	} else {
+		f.curInput = f.mutator.Mutate(f.curInput)
+	}
 }
 
 func (f *FuzzStrategy) NextIteration(ctx *strategies.Context) {
-
+	if f.replicaStore == nil {
+		f.replicaStore = ctx.ReplicaStore
+	}
+	f.generateInput()
+	f.lock.Lock()
+	f.fuzzEnabled = true
+	f.iteration += 1
+	f.lock.Unlock()
 }
 
 func (f *FuzzStrategy) Finalize(ctx *strategies.Context) {
@@ -90,5 +139,4 @@ func (f *FuzzStrategy) Stop() error {
 }
 
 func (f *FuzzStrategy) Step(e *types.Event, ctx *strategies.Context) {
-
 }

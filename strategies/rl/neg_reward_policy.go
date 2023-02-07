@@ -76,6 +76,11 @@ func (n *NegativeRewardPolicy) NextIteration(iteration int, trace *Trace) {
 			continue
 		}
 		stateHash := state.Hash()
+		var nextState State
+		if i+1 < traceLength {
+			nextState, _, _ = trace.Get(i + 1)
+		}
+		nextStateHash := nextState.Hash()
 		actionKey := action.Name()
 		if _, ok := n.qmap[stateHash]; !ok {
 			continue
@@ -85,9 +90,11 @@ func (n *NegativeRewardPolicy) NextIteration(iteration int, trace *Trace) {
 		}
 		curVal := n.qmap[stateHash][actionKey]
 		max := float64(0)
-		for _, val := range n.qmap[stateHash] {
-			if val > max {
-				max = val
+		if _, ok := n.qmap[nextStateHash]; ok {
+			for _, val := range n.qmap[nextStateHash] {
+				if val > max {
+					max = val
+				}
 			}
 		}
 		nextVal := (1-n.Alpha)*curVal + n.Alpha*(-1+n.Gamma*max)
