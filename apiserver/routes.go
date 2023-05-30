@@ -78,16 +78,11 @@ func (srv *APIServer) handleReplicaPost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
-type eventS struct {
-	types.Event `json:",inline"`
-	Params      map[string]string `json:"params"`
-}
-
 // handleEvent is the handler for the router `/event` .
 // The route is used by replicas to send events to the scheduler
 func (srv *APIServer) handleEvent(c *gin.Context) {
-	var e eventS
-	if err := c.ShouldBindJSON(&e); err != nil {
+	var e = &types.Event{}
+	if err := c.ShouldBindJSON(e); err != nil {
 		srv.Logger.With(log.LogParams{"error": err}).Debug("Bad event request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to unmarshal request"})
 		return
@@ -125,12 +120,13 @@ func (srv *APIServer) handleEvent(c *gin.Context) {
 	default:
 		eventType = types.NewGenericEventType(e.Params, e.TypeS)
 	}
-	event := types.NewEvent(
+	event := types.NewEventWithParams(
 		e.Replica,
 		eventType,
 		eventType.String(),
 		types.EventID((srv.gen.Next())),
 		e.Timestamp,
+		e.Params,
 	)
 
 	srv.Logger.With(log.LogParams{

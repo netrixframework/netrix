@@ -53,7 +53,6 @@ func NewTestingServer(config *config.Config, messageParser types.MessageParser, 
 func (srv *TestingServer) Start() {
 	srv.StartRunning()
 	srv.apiserver.Start()
-	srv.ctx.Start()
 	srv.execute()
 
 	// Just keep running until asked to stop
@@ -70,5 +69,4 @@ func (srv *TestingServer) Done() chan string {
 func (srv *TestingServer) Stop() {
 	srv.StopRunning()
 	srv.apiserver.Stop()
-	srv.ctx.Stop()
 }

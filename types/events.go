@@ -26,6 +26,8 @@ type Event struct {
 	ID EventID `json:"id"`
 	// Timestamp of the event
 	Timestamp int64 `json:"timestamp"`
+	// Additional params of the event
+	Params map[string]string `json:"params"`
 }
 
 // NewEvent creates an [Event] with the specified values
@@ -36,7 +38,23 @@ func NewEvent(replica ReplicaID, t EventType, ts string, id EventID, time int64)
 		TypeS:     ts,
 		ID:        id,
 		Timestamp: time,
+		Params:    make(map[string]string),
 	}
+}
+
+func NewEventWithParams(replica ReplicaID, t EventType, ts string, id EventID, time int64, params map[string]string) *Event {
+	e := &Event{
+		Replica:   replica,
+		Type:      t,
+		TypeS:     ts,
+		ID:        id,
+		Timestamp: time,
+		Params:    make(map[string]string),
+	}
+	for k, v := range params {
+		e.Params[k] = v
+	}
+	return e
 }
 
 // MessageID returns the message ID of the corresponding message when the event type is either
