@@ -34,30 +34,18 @@ func NewRootContext(config *config.Config, logger *log.Logger) *RootContext {
 		Config:       config,
 		EventIDGen:   util.NewCounter(),
 		Replicas:     types.NewReplicaStore(config.NumReplicas),
-		MessageQueue: types.NewQueue[*types.Message](logger),
+		MessageQueue: types.NewQueue[*types.Message](),
 		MessageStore: types.NewMap[types.MessageID, *types.Message](),
-		EventQueue:   types.NewQueue[*types.Event](logger),
+		EventQueue:   types.NewQueue[*types.Event](),
 		Logger:       logger,
 		ReportStore:  types.NewReportLogs(),
 	}
 }
 
-// Start implements Service and initializes the queues
-func (c *RootContext) Start() {
-	c.MessageQueue.Start()
-	c.EventQueue.Start()
-}
-
-// Stop implements Service and terminates the queues
-func (c *RootContext) Stop() {
-	c.MessageQueue.Stop()
-	c.EventQueue.Stop()
-}
-
 // Reset implements Service
 func (c *RootContext) Reset() {
-	c.MessageQueue.Flush()
-	c.EventQueue.Flush()
+	c.MessageQueue.Reset()
+	c.EventQueue.Reset()
 
 	c.MessageStore.RemoveAll()
 }

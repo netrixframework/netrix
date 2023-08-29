@@ -47,7 +47,7 @@ func (t *ThomsonSamplingPolicy) NextAction(step int, state State, actions []*Act
 }
 
 func (t *ThomsonSamplingPolicy) Update(step int, curState State, action *Action, nextState State) {
-	// nextStateKey := nextState.Hash()
+	nextStateKey := nextState.Hash()
 	stateKey := curState.Hash()
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -59,14 +59,14 @@ func (t *ThomsonSamplingPolicy) Update(step int, curState State, action *Action,
 		t.sMap[stateKey][action.Name()] = &distuv.Beta{Alpha: 1, Beta: 1}
 	}
 
-	// reward := 0
-	// if _, ok := t.sMap[nextStateKey]; !ok {
-	// 	reward = 1
-	// }
+	reward := 0
+	if _, ok := t.sMap[nextStateKey]; !ok {
+		reward = 1
+	}
 	curDist := t.sMap[stateKey][action.Name()]
 	t.sMap[stateKey][action.Name()] = &distuv.Beta{
-		Alpha: curDist.Alpha,    // + float64(reward),
-		Beta:  curDist.Beta + 1, //float64(1-reward),
+		Alpha: curDist.Alpha + float64(reward),
+		Beta:  curDist.Beta + float64(1-reward),
 	}
 }
 

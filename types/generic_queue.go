@@ -4,8 +4,6 @@ import (
 	"math/rand"
 	"sync"
 	"time"
-
-	"github.com/netrixframework/netrix/log"
 )
 
 // Clonable is any type which returns a copy of itself on Clone()
@@ -14,91 +12,27 @@ type Clonable interface {
 }
 
 // Queue is a generic pub-sub queue that is thread safe
-type Queue[V Clonable] struct {
-	vals        []V
-	subscribers map[string]*Channel[V]
-	lock        *sync.Mutex
-	size        int
-	dispatchWG  *sync.WaitGroup
-	discard     bool
-	*BaseService
+type Queue[V any] struct {
+	vals    []V
+	lock    *sync.Mutex
+	size    int
+	discard bool
 }
 
 // NewQueue[V] returns an empty Queue[V]
-func NewQueue[V Clonable](logger *log.Logger) *Queue[V] {
+func NewQueue[V any]() *Queue[V] {
 	return &Queue[V]{
-		vals:        make([]V, 0),
-		size:        0,
-		subscribers: make(map[string]*Channel[V]),
-		lock:        new(sync.Mutex),
-		dispatchWG:  new(sync.WaitGroup),
-		discard:     false,
-		BaseService: NewBaseService("Queue[V]", logger),
+		vals:    make([]V, 0),
+		size:    0,
+		lock:    new(sync.Mutex),
+		discard: false,
 	}
-}
-
-// Start implements Service
-func (q *Queue[V]) Start() error {
-	q.StartRunning()
-	// go q.dispatchLoop()
-	return nil
-}
-
-func (q *Queue[V]) dispatchLoop() {
-	for {
-		q.lock.Lock()
-		size := q.size
-		vals := q.vals
-		subscribers := q.subscribers
-		discard := q.discard
-		q.lock.Unlock()
-
-		if size > 0 {
-			toAdd := vals[0]
-			if !discard {
-				for _, s := range subscribers {
-					q.dispatchWG.Add(1)
-					go func(subs *Channel[V]) {
-						select {
-						case <-q.QuitCh():
-						default:
-							subs.BlockingAdd(toAdd.Clone().(V))
-						}
-						q.dispatchWG.Done()
-					}(s)
-				}
-			}
-
-			q.lock.Lock()
-			q.size = q.size - 1
-			q.vals = q.vals[1:]
-			q.lock.Unlock()
-		}
-
-		select {
-		case <-q.QuitCh():
-			return
-		default:
-		}
-
-	}
-}
-
-// Stop implements [Service]
-func (q *Queue[V]) Stop() error {
-	q.StopRunning()
-	q.dispatchWG.Wait()
-	return nil
 }
 
 // Add adds a message to the queue
 func (q *Queue[V]) Add(m V) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
-
-	if q.discard {
-		return
-	}
 
 	q.vals = append(q.vals, m)
 	q.size = q.size + 1
@@ -120,25 +54,13 @@ func (q *Queue[V]) Resume() {
 	q.discard = false
 }
 
-// Flush clears the queue of all messages
-func (q *Queue[V]) Flush() {
+// Reset clears the queue of all messages
+func (q *Queue[V]) Reset() {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
 	q.vals = make([]V, 0)
 	q.size = 0
-}
-
-// Restart implements Service
-func (q *Queue[V]) Restart() error {
-	q.Flush()
-	q.lock.Lock()
-	defer q.lock.Unlock()
-
-	for _, s := range q.subscribers {
-		s.Reset()
-	}
-	return nil
 }
 
 // Pop returns an element at the head of the queue
@@ -156,17 +78,11 @@ func (q *Queue[V]) Pop() (V, bool) {
 	return result, true
 }
 
-// Subscribe creates and returns a channel for the subscriber with the given label
-func (q *Queue[V]) Subscribe(label string) *Channel[V] {
+// Returns the size of the queue
+func (q *Queue[V]) Size() int {
 	q.lock.Lock()
 	defer q.lock.Unlock()
-	ch, ok := q.subscribers[label]
-	if ok {
-		return ch
-	}
-	newChan := NewChannel[V]()
-	q.subscribers[label] = newChan
-	return newChan
+	return q.size
 }
 
 // Channel[V] is a synchronized channel that can be reset (closed and opened) multiple times.

@@ -79,7 +79,6 @@ func NewStrategyDriver(
 func (d *Driver) Start() error {
 	d.StartRunning()
 	d.apiserver.Start()
-	d.ctx.Start()
 	go d.pollEvents()
 	go d.pollActions()
 	d.strategy.Start()
@@ -99,7 +98,6 @@ func (d *Driver) Start() error {
 func (d *Driver) Stop() error {
 	d.StopRunning()
 	d.apiserver.Stop()
-	d.ctx.Stop()
 	d.strategy.Stop()
 	return nil
 }

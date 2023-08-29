@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/json"
 	"math/rand"
 	"sync"
 	"time"
@@ -220,6 +221,23 @@ func (l *List[V]) RemoveAll() []V {
 	l.elems = make([]V, 0)
 	l.size = 0
 	return result
+}
+
+func (l *List[V]) MarshalJSON() ([]byte, error) {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	return json.Marshal(l.elems)
+}
+
+func (l *List[V]) Set(index int, elem V) bool {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	if l.size <= index {
+		return false
+	}
+	l.elems[index] = elem
+	return true
 }
 
 // Max[T] abstracts the max function for all ordered types T
