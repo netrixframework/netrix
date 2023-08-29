@@ -76,9 +76,9 @@ func (n *NegativeRewardPolicy) NextIteration(iteration int, trace *Trace) {
 			continue
 		}
 		stateHash := state.Hash()
-		var nextState State
-		if i+1 < traceLength {
-			nextState, _, _ = trace.Get(i + 1)
+		nextState, _, ok := trace.Get(i + 1)
+		if !ok {
+			continue
 		}
 		nextStateHash := nextState.Hash()
 		actionKey := action.Name()

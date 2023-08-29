@@ -70,6 +70,7 @@ func NewRLStrategy(config *RLStrategyConfig) (*RLStrategy, error) {
 		agentEnabledLock:    new(sync.Mutex),
 		curTimeoutState:     false,
 		curTimeoutStateLock: new(sync.Mutex),
+		timeoutRand:         rand.New(rand.NewSource(time.Now().UnixNano())),
 	}, nil
 }
 
